@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Echo Puddle</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#080b12;color:#dce8ff;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;touch-action:none}
+  canvas{display:block;width:100%;height:100%}
+  .label{position:fixed;left:14px;top:12px;font-size:12px;opacity:.7;pointer-events:none;letter-spacing:.08em}
+  .hint{position:fixed;left:14px;bottom:14px;right:14px;font-size:11px;line-height:1.45;opacity:.48;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="label">ECHO PUDDLE</div>
+<div class="hint">touch the dark water. some ripples remember.</div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+let w=0,h=0,dpr=1,t=0,last=0;
+const ripples=[], echoes=[], motes=[];
+function resize(){dpr=Math.min(devicePixelRatio||1,2);w=innerWidth;h=innerHeight;c.width=w*dpr;c.height=h*dpr;x.setTransform(dpr,0,0,dpr,0,0)}
+addEventListener('resize',resize);resize();
+for(let i=0;i<42;i++) motes.push({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.08,vy:(Math.random()-.5)*.08,r:Math.random()*1.4+.3});
+function splash(px,py,ghost=false){
+  ripples.push({x:px,y:py,r:2,a:ghost?.28:.8,life:0,ghost});
+  if(!ghost && Math.random()<.68){
+    const delay=700+Math.random()*5200;
+    echoes.push({x:px+(Math.random()-.5)*80,y:py+(Math.random()-.5)*80,at:performance.now()+delay});
+  }
+}
+function input(e){const p=e.touches?e.touches[0]:e;splash(p.clientX,p.clientY,false)}
+addEventListener('pointerdown',input);
+function loop(now){
+  const dt=Math.min(32,now-last||16);last=now;t+=dt;
+  x.clearRect(0,0,w,h);
+  const g=x.createRadialGradient(w*.5,h*.45,0,w*.5,h*.45,Math.max(w,h)*.75);
+  g.addColorStop(0,'#101a2a');g.addColorStop(1,'#05070d');x.fillStyle=g;x.fillRect(0,0,w,h);
+  for(const m of motes){
+    m.x+=m.vx*dt;m.y+=m.vy*dt;
+    m.x+=Math.sin((t+m.y*7)*.00022)*.012*dt;
+    m.y+=Math.cos((t+m.x*5)*.00018)*.01*dt;
+    if(m.x<0)m.x=w;if(m.x>w)m.x=0;if(m.y<0)m.y=h;if(m.y>h)m.y=0;
+    x.beginPath();x.arc(m.x,m.y,m.r,0,Math.PI*2);x.fillStyle='rgba(180,210,255,.18)';x.fill();
+  }
+  for(let i=echoes.length-1;i>=0;i--){if(now>=echoes[i].at){let e=echoes.splice(i,1)[0];splash(Math.max(10,Math.min(w-10,e.x)),Math.max(10,Math.min(h-10,e.y)),true)}}
+  for(let i=ripples.length-1;i>=0;i--){
+    const r=ripples[i];r.life+=dt;r.r+=dt*(r.ghost?.035:.055);r.a*=Math.pow(.995,dt);
+    x.beginPath();x.arc(r.x,r.y,r.r,0,Math.PI*2);x.strokeStyle=`rgba(${r.ghost?'140,190,255':'220,240,255'},${r.a})`;x.lineWidth=r.ghost?1:1.4;x.stroke();
+    if(r.life>2600||r.a<.01)ripples.splice(i,1);
+  }
+  if(Math.random()<.0018) splash(Math.random()*w,Math.random()*h,true);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
