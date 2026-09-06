@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>Hesitation Garden</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0f1110;color:#dce8d7;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{display:block;width:100%;height:100%}
+#whisper{position:fixed;left:18px;right:18px;top:max(18px,env(safe-area-inset-top));text-align:center;font-size:12px;letter-spacing:.09em;opacity:.55;pointer-events:none;transition:opacity 1.2s}
+#memory{position:fixed;left:14px;bottom:max(14px,env(safe-area-inset-bottom));font-size:11px;opacity:.5;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="whisper">the garden is listening for what you almost do</div>
+<div id="memory">memory: blank</div>
+<script>
+const c=document.querySelector('#c'),ctx=c.getContext('2d'),whisper=document.querySelector('#whisper'),memory=document.querySelector('#memory');
+let W=innerWidth,H=innerHeight,D=Math.min(devicePixelRatio||1,2),last=0,time=0;
+function resize(){W=innerWidth;H=innerHeight;D=Math.min(devicePixelRatio||1,2);c.width=W*D;c.height=H*D;ctx.setTransform(D,0,0,D,0,0)}
+addEventListener('resize',resize);resize();
+let pointer={x:W/2,y:H/2,down:false,moved:false,downAt:0,lastMove:0,lastX:W/2,lastY:H/2};
+let growth=[],ghosts=[],rings=[],visits=0,patience=0,absence=0;
+let heat=Array.from({length:10},()=>Array(10).fill(0));
+function cell(x,y){return [Math.max(0,Math.min(9,Math.floor(x/W*10))),Math.max(0,Math.min(9,Math.floor(y/H*10)))];}
+function plant(x,y,kind='stem',strength=1){growth.push({x,y,kind,strength,age:0,lean:(Math.random()-.5)*1.2,seed:Math.random()*999}); if(growth.length>180)growth.shift();}
+function noteVisit(x,y,amt=1){const [cx,cy]=cell(x,y);heat[cy][cx]+=amt; visits++;}
+function sentence(){let max=0,mx=0,my=0,total=0;for(let y=0;y<10;y++)for(let x=0;x<10;x++){const v=heat[y][x];total+=v;if(v>max){max=v;mx=x;my=y}}
+ if(total<3)return 'memory: blank';
+ const horiz=mx<3?'left':mx>6?'right':'middle',vert=my<3?'high':my>6?'low':'center';
+ return `memory: you keep returning ${vert}-${horiz}`;
+}
+function ripple(x,y,soft=false){rings.push({x,y,r:4,a:soft?.25:.55,soft});if(rings.length>40)rings.shift()}
+c.addEventListener('pointerdown',e=>{pointer.down=true;pointer.moved=false;pointer.downAt=performance.now();pointer.lastMove=performance.now();pointer.x=e.clientX;pointer.y=e.clientY;pointer.lastX=pointer.x;pointer.lastY=pointer.y;noteVisit(pointer.x,pointer.y,.5);ripple(pointer.x,pointer.y,true)});
+c.addEventListener('pointermove',e=>{const now=performance.now(),dx=e.clientX-pointer.lastX,dy=e.clientY-pointer.lastY,d=Math.hypot(dx,dy);pointer.x=e.clientX;pointer.y=e.clientY;if(d>2){pointer.moved=true;pointer.lastMove=now;pointer.lastX=pointer.x;pointer.lastY=pointer.y;if(pointer.down && Math.random()<.15){ghosts.push({x:pointer.x,y:pointer.y,a:.18,age:0});if(ghosts.length>80)ghosts.shift()}}});
+addEventListener('pointerup',e=>{if(!pointer.down)return;const held=performance.now()-pointer.downAt;pointer.down=false;noteVisit(pointer.x,pointer.y,Math.min(3,.5+held/1000));
+ if(!pointer.moved && held<220){plant(pointer.x,pointer.y,'bud',.5);ripple(pointer.x,pointer.y)}
+ else if(held>900){plant(pointer.x,pointer.y,'flower',Math.min(2,held/1800));whisper.textContent='that pause became a flower';whisper.style.opacity=.8;setTimeout(()=>whisper.style.opacity=.35,1200)}
+ else if(pointer.moved){plant(pointer.x,pointer.y,'bend',.8)}
+ memory.textContent=sentence();});
+function update(dt){time+=dt;absence+=dt;if(pointer.down){const still=performance.now()-pointer.lastMove;if(still>500){patience+=dt; if(Math.random()<dt*.0025){plant(pointer.x+(Math.random()-.5)*24,pointer.y+(Math.random()-.5)*24,still>1800?'flower':'stem',Math.min(1.5,still/1300));ripple(pointer.x,pointer.y,true)}}}
+ for(const g of growth)g.age+=dt;for(const q of ghosts)q.age+=dt;ghosts=ghosts.filter(q=>q.age<2600);for(const r of rings){r.r+=dt*.035;r.a*=Math.pow(.985,dt/16)}rings=rings.filter(r=>r.a>.015);
+ if(absence>5000&&Math.random()<dt*.00035){const x=W*(.2+Math.random()*.6),y=H*(.25+Math.random()*.55);plant(x,y,'wild',.4);absence=0;whisper.textContent='it grew while you were gone';whisper.style.opacity=.7;setTimeout(()=>whisper.style.opacity=.35,1600)}
+}
+function drawPlant(g){const age=Math.min(1,g.age/1200),h=(12+28*g.strength)*age,wind=Math.sin(time*.0012+g.seed)*3*g.strength;ctx.save();ctx.translate(g.x,g.y);ctx.strokeStyle=`rgba(126,174,121,${.2+.45*age})`;ctx.lineWidth=1.2+g.strength*.7;ctx.beginPath();ctx.moveTo(0,0);ctx.quadraticCurveTo(g.lean*8+wind,-h*.5,g.lean*12+wind,-h);ctx.stroke();
+ const tx=g.lean*12+wind,ty=-h;
+ if(g.kind==='flower'||g.kind==='wild'){const petals=g.kind==='wild'?5:7;for(let i=0;i<petals;i++){const a=i/petals*Math.PI*2+time*.0002;ctx.fillStyle=g.kind==='wild'?'rgba(182,173,211,.5)':'rgba(218,202,132,.62)';ctx.beginPath();ctx.ellipse(tx+Math.cos(a)*5,ty+Math.sin(a)*5,3.6,1.8,a,0,Math.PI*2);ctx.fill()}ctx.fillStyle='rgba(245,236,187,.7)';ctx.beginPath();ctx.arc(tx,ty,2.2,0,Math.PI*2);ctx.fill()}
+ else if(g.kind==='bud'){ctx.fillStyle='rgba(176,196,139,.5)';ctx.beginPath();ctx.arc(tx,ty,3.6,0,Math.PI*2);ctx.fill()}
+ else {ctx.fillStyle='rgba(128,166,116,.32)';ctx.beginPath();ctx.ellipse(tx-3,ty+5,5,2,-.6,0,Math.PI*2);ctx.fill()}
+ ctx.restore();}
+function draw(){ctx.clearRect(0,0,W,H);const bg=ctx.createRadialGradient(W*.5,H*.55,20,W*.5,H*.55,Math.max(W,H)*.75);bg.addColorStop(0,'#172019');bg.addColorStop(1,'#090b09');ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+ for(let y=0;y<10;y++)for(let x=0;x<10;x++){const v=heat[y][x];if(v>.6){ctx.fillStyle=`rgba(72,101,72,${Math.min(.08,v*.006)})`;ctx.fillRect(x*W/10,y*H/10,W/10,H/10)}}
+ for(const q of ghosts){const a=(1-q.age/2600)*.13;ctx.fillStyle=`rgba(205,223,204,${a})`;ctx.beginPath();ctx.arc(q.x,q.y,2+q.age*.002,0,Math.PI*2);ctx.fill()}
+ for(const g of growth)drawPlant(g);
+ for(const r of rings){ctx.strokeStyle=`rgba(203,224,195,${r.a})`;ctx.lineWidth=r.soft?1:1.5;ctx.beginPath();ctx.arc(r.x,r.y,r.r,0,Math.PI*2);ctx.stroke()}
+ if(pointer.down){const held=performance.now()-pointer.downAt;if(held>350){ctx.strokeStyle=`rgba(222,237,211,${Math.min(.5,held/3500)})`;ctx.lineWidth=1;ctx.beginPath();ctx.arc(pointer.x,pointer.y,7+Math.sin(time*.006)*2,0,Math.PI*2);ctx.stroke()}}
+}
+function loop(n){const dt=Math.min(34,n-last||16);last=n;update(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+</script>
+</body>
+</html>
