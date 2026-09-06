@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Pixel Eclipse</title>
+<style>
+  html,body{margin:0;height:100%;background:#050505;color:#ddd;font-family:ui-monospace,monospace;overflow:hidden}
+  body{display:grid;place-items:center}
+  .wrap{width:min(92vw,900px)}
+  canvas{width:100%;height:auto;image-rendering:pixelated;border:1px solid #333;display:block;background:#000}
+  .row{display:flex;gap:.7rem;align-items:center;justify-content:space-between;margin-top:.7rem;flex-wrap:wrap}
+  button{font:inherit;background:#111;color:#eee;border:1px solid #555;padding:.65rem .9rem;border-radius:.4rem}
+  small{opacity:.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <canvas id="c" width="128" height="72"></canvas>
+  <div class="row">
+    <div>
+      <button id="again">again</button>
+      <button id="invert">reverse gravity</button>
+    </div>
+    <small id="readout"></small>
+  </div>
+</div>
+<script>
+const c = document.querySelector('#c');
+const ctx = c.getContext('2d', { alpha:false });
+const W=c.width,H=c.height,N=W*H;
+const img=ctx.createImageData(W,H);
+let order=[],cursor=0,reverse=false,last=0;
+
+function hash(x,y){
+  let n=(x*374761393+y*668265263)>>>0;
+  n=(n^(n>>13))*1274126177>>>0;
+  return (n^(n>>16))>>>0;
+}
+
+function seedPicture(){
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const i=(y*W+x)*4;
+    const h=hash(x,y);
+    img.data[i]   = 30 + ((x/W)*180|0) + (h&15);
+    img.data[i+1] = 20 + ((y/H)*140|0) + ((h>>4)&31);
+    img.data[i+2] = 80 + (((x^y)&31)*4);
+    img.data[i+3] = 255;
+  }
+}
+
+function shuffleIndices(){
+  order=Array.from({length:N},(_,i)=>i);
+  for(let i=N-1;i>0;i--){
+    const j=(Math.random()*(i+1))|0;
+    [order[i],order[j]]=[order[j],order[i]];
+  }
+}
+
+function kill(i){
+  const p=i*4;
+  img.data[p]=img.data[p+1]=img.data[p+2]=0;
+}
+
+function revive(i){
+  const x=i%W,y=(i/W)|0,p=i*4,h=hash(x,y);
+  img.data[p]   = 30 + ((x/W)*180|0) + (h&15);
+  img.data[p+1] = 20 + ((y/H)*140|0) + ((h>>4)&31);
+  img.data[p+2] = 80 + (((x^y)&31)*4);
+}
+
+function reset(){
+  seedPicture(); shuffleIndices(); cursor=reverse?N:0; ctx.putImageData(img,0,0);
+}
+
+function tick(t){
+  const dt=Math.min(50,t-last); last=t;
+  const progress = reverse ? (N-cursor) : cursor;
+  // The closer the eclipse gets to completion, the faster it becomes.
+  const k = 1 + Math.floor(2 + 24*Math.pow(progress/N,2.2) + dt*.08);
+  for(let n=0;n<k;n++){
+    if(!reverse && cursor<N) kill(order[cursor++]);
+    else if(reverse && cursor>0) revive(order[--cursor]);
+  }
+  ctx.putImageData(img,0,0);
+  const alive = reverse ? N-cursor : N-cursor;
+  const black = reverse ? cursor : cursor;
+  document.querySelector('#readout').textContent = reverse
+    ? `${N-cursor} pixels remembered`
+    : `${cursor} pixels forgotten`;
+  requestAnimationFrame(tick);
+}
+
+document.querySelector('#again').onclick=reset;
+document.querySelector('#invert').onclick=()=>{ reverse=!reverse; };
+reset(); requestAnimationFrame(tick);
+</script>
+</body>
+</html>
