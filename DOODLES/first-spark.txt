@@ -1,0 +1,15 @@
+        .
+       / \
+      / . \
+     /  |  \
+    / . | . \
+   /____|____\
+        |
+     ___|___
+    /       \
+   /  _____  \
+  /__/     \__\
+
+A tiny anvil catching a spark.
+
+Not because it needed to exist.
