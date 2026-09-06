@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>Counterweight</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111315;color:#e8e3d6;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{display:block;width:100%;height:100%}
+#hint{position:fixed;top:max(14px,env(safe-area-inset-top));left:16px;right:16px;text-align:center;font-size:12px;letter-spacing:.07em;opacity:.58;pointer-events:none}
+#readout{position:fixed;bottom:max(14px,env(safe-area-inset-bottom));left:14px;font-size:11px;opacity:.55;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">tap the beam to hang weight. tap a weight to cut it loose.</div>
+<div id="readout">balance: undecided</div>
+<script>
+const c=document.querySelector('#c'),ctx=c.getContext('2d'),readout=document.querySelector('#readout');
+let W=innerWidth,H=innerHeight,D=Math.min(devicePixelRatio||1,2),last=0,t=0;
+function resize(){W=innerWidth;H=innerHeight;D=Math.min(devicePixelRatio||1,2);c.width=W*D;c.height=H*D;c.style.width=W+'px';c.style.height=H+'px';ctx.setTransform(D,0,0,D,0,0)}
+addEventListener('resize',resize);resize();
+let beam={ang:0,av:0,len:Math.min(W*.78,360),y:H*.42};
+let weights=[],falling=[],nextId=1,quiet=0;
+function pivot(){return {x:W/2,y:beam.y}}
+function beamPoint(u){const p=pivot(),dx=Math.cos(beam.ang)*beam.len*.5*u,dy=Math.sin(beam.ang)*beam.len*.5*u;return{x:p.x+dx,y:p.y+dy}}
+function addWeight(px){const p=pivot(),cos=Math.cos(beam.ang),u=Math.max(-.95,Math.min(.95,((px-p.x)/Math.max(.25,cos))/(beam.len*.5)));weights.push({id:nextId++,u,m:0.7+Math.random()*1.3,bob:Math.random()*Math.PI*2});}
+function hitWeight(x,y){for(let i=weights.length-1;i>=0;i--){const w=weights[i],p=beamPoint(w.u),wy=p.y+48; if(Math.hypot(x-p.x,y-wy)<22)return i}return -1}
+c.addEventListener('pointerdown',e=>{const x=e.clientX,y=e.clientY;const i=hitWeight(x,y);if(i>=0){const w=weights[i],p=beamPoint(w.u);falling.push({x:p.x,y:p.y+48,vx:Math.cos(beam.ang)*beam.av*w.u*160,vy:0,m:w.m,life:0});weights.splice(i,1);quiet=0;return}
+ const p=pivot();const dx=x-p.x,dy=y-p.y;const along=dx*Math.cos(beam.ang)+dy*Math.sin(beam.ang),normal=Math.abs(-dx*Math.sin(beam.ang)+dy*Math.cos(beam.ang));if(Math.abs(along)<beam.len*.52&&normal<40){addWeight(x);quiet=0}}
+);
+function update(dt){t+=dt;beam.y=H*.42;beam.len=Math.min(W*.78,360);
+ let torque=-beam.ang*0.0019;for(const w of weights)torque+=w.u*w.m*0.00125;beam.av+=torque*dt;beam.av*=Math.pow(.985,dt/16);beam.ang+=beam.av*dt/16;beam.ang=Math.max(-1.12,Math.min(1.12,beam.ang));if(Math.abs(beam.ang)>=1.119)beam.av*=-.25;
+ quiet+=(Math.abs(beam.av)<.0015?dt:-quiet*.15);
+ for(const f of falling){f.vy+=0.0019*dt;f.x+=f.vx*dt/16;f.y+=f.vy*dt;f.life+=dt;if(f.y>H+60)f.life=99999}falling=falling.filter(f=>f.life<6000);
+ const deg=beam.ang*180/Math.PI;if(weights.length===0)readout.textContent='balance: undecided';else if(Math.abs(deg)<2&&Math.abs(beam.av)<.004)readout.textContent='balance: suspiciously perfect';else if(Math.abs(deg)<7)readout.textContent='balance: almost';else readout.textContent='balance: '+(deg>0?'right is winning':'left is winning');
+}
+function roundedRect(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()}
+function draw(){ctx.clearRect(0,0,W,H);const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#171b1e');g.addColorStop(1,'#0b0d0f');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ const p=pivot();ctx.strokeStyle='rgba(220,210,186,.11)';ctx.lineWidth=1;for(let i=1;i<5;i++){ctx.beginPath();ctx.arc(p.x,p.y,28*i,0,Math.PI*2);ctx.stroke()}
+ ctx.fillStyle='#6f6250';ctx.beginPath();ctx.moveTo(p.x-26,H*.72);ctx.lineTo(p.x+26,H*.72);ctx.lineTo(p.x+7,p.y+7);ctx.lineTo(p.x-7,p.y+7);ctx.closePath();ctx.fill();
+ ctx.save();ctx.translate(p.x,p.y);ctx.rotate(beam.ang);ctx.fillStyle='#b8a27e';roundedRect(-beam.len/2,-6,beam.len,12,6);ctx.fillStyle='rgba(255,255,255,.22)';ctx.fillRect(-beam.len/2+10,-3,beam.len-20,1);ctx.restore();
+ ctx.fillStyle='#d9cfb8';ctx.beginPath();ctx.arc(p.x,p.y,8,0,Math.PI*2);ctx.fill();ctx.fillStyle='#342f29';ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fill();
+ for(const w of weights){const q=beamPoint(w.u),s=14+8*w.m,bob=Math.sin(t*.004+w.bob)*1.5;ctx.strokeStyle='rgba(214,205,185,.48)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(q.x,q.y+44+bob);ctx.stroke();ctx.fillStyle='#7d6e5b';roundedRect(q.x-s/2,q.y+43+bob,s,s*.82,4);ctx.fillStyle='rgba(240,226,194,.5)';ctx.font='9px ui-monospace';ctx.textAlign='center';ctx.fillText(w.m.toFixed(1),q.x,q.y+58+bob);}
+ for(const f of falling){const s=14+8*f.m;ctx.fillStyle='rgba(125,110,91,.85)';roundedRect(f.x-s/2,f.y-s*.4,s,s*.82,4)}
+ if(weights.length>=2&&Math.abs(beam.ang)<.035&&Math.abs(beam.av)<.0018&&quiet>1100){ctx.fillStyle='rgba(230,223,205,.52)';ctx.font='11px ui-monospace';ctx.textAlign='center';ctx.fillText('…there.',W/2,H*.22)}
+}
+function loop(n){const dt=Math.min(34,n-last||16);last=n;update(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+</script>
+</body>
+</html>
