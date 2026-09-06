@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>Other Hand</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#09080d;color:#e9e5ff;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{display:block;width:100%;height:100%}
+#text{position:fixed;left:18px;right:18px;top:max(18px,env(safe-area-inset-top));text-align:center;font-size:12px;letter-spacing:.11em;opacity:.42;pointer-events:none;transition:opacity 1s}
+#count{position:fixed;left:14px;bottom:max(14px,env(safe-area-inset-bottom));font-size:11px;opacity:.28;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="text">touch somewhere. then do it again.</div>
+<div id="count">the room has no memory yet</div>
+<script>
+const c=document.querySelector('#c'),ctx=c.getContext('2d'),text=document.querySelector('#text'),count=document.querySelector('#count');
+let W=innerWidth,H=innerHeight,D=Math.min(devicePixelRatio||1,2),last=0,t=0;
+function resize(){W=innerWidth;H=innerHeight;D=Math.min(devicePixelRatio||1,2);c.width=W*D;c.height=H*D;c.style.width=W+'px';c.style.height=H+'px';ctx.setTransform(D,0,0,D,0,0)}
+addEventListener('resize',resize);resize();
+let live=null,strokes=[],dust=[],echoes=[],idle=0,encounters=0,anticipation=0;
+function p(e){return{x:e.clientX,y:e.clientY,t:performance.now()}}
+function begin(e){idle=0;live=[p(e)]; if(strokes.length>2)spawnPrediction(live[0]);}
+function move(e){if(!live)return;idle=0;const q=p(e),a=live[live.length-1];if(Math.hypot(q.x-a.x,q.y-a.y)>3){live.push(q);if(live.length>220)live.shift(); for(let i=0;i<2;i++)dust.push({x:q.x+(Math.random()-.5)*5,y:q.y+(Math.random()-.5)*5,a:.28+Math.random()*.18,r:1+Math.random()*2}); if(dust.length>280)dust.splice(0,dust.length-280)}}
+function end(){if(!live)return; if(live.length>2){strokes.push(live.map(q=>({x:q.x,y:q.y,dt:q.t-live[0].t})));if(strokes.length>12)strokes.shift();encounters++;} live=null; count.textContent=encounters<2?'the room noticed':encounters<5?'the room is comparing you':encounters<8?'the room is rehearsing you':'the room has started arriving early'; if(encounters===3)say('something behind the glass is practicing'); if(encounters===6)say('it has begun to guess'); if(encounters===9)say('you are no longer alone in the gesture');}
+c.addEventListener('pointerdown',e=>{c.setPointerCapture?.(e.pointerId);begin(e)});c.addEventListener('pointermove',move);c.addEventListener('pointerup',end);c.addEventListener('pointercancel',end);
+function say(s){text.textContent=s;text.style.opacity=.8;setTimeout(()=>text.style.opacity=.35,2200)}
+function nearestStroke(start){let best=null,b=1e9;for(const s of strokes){const q=s[0],d=Math.hypot(q.x-start.x,q.y-start.y);if(d<b){b=d;best=s}}return best}
+function spawnPrediction(start){const base=nearestStroke(start);if(!base)return;anticipation=Math.min(1,(encounters-2)/8);const mirror=Math.random()<.28;const rot=(Math.random()-.5)*(.15+.28*(1-anticipation));const sc=.9+Math.random()*.2;const ox=start.x-base[0].x,oy=start.y-base[0].y;const cs=Math.cos(rot),sn=Math.sin(rot);const pts=base.map((q,i)=>{let dx=(q.x-base[0].x)*sc,dy=(q.y-base[0].y)*sc;if(mirror)dx*=-1;return{x:start.x+dx*cs-dy*sn,y:start.y+dx*sn+dy*cs,dt:Math.max(0,q.dt*(1.12-anticipation*.55)-anticipation*120),i}});echoes.push({pts,born:performance.now(),alpha:.52,kind:'predict'});}
+function spawnDream(){if(!strokes.length)return;const s=strokes[Math.floor(Math.random()*strokes.length)],cx=W*(.2+Math.random()*.6),cy=H*(.25+Math.random()*.5),sx=s[0].x,sy=s[0].y;const rot=(Math.random()-.5)*1.4,cs=Math.cos(rot),sn=Math.sin(rot),sc=.5+Math.random()*.65;const pts=s.map(q=>{const dx=(q.x-sx)*sc,dy=(q.y-sy)*sc;return{x:cx+dx*cs-dy*sn,y:cy+dx*sn+dy*cs,dt:q.dt*.75}});echoes.push({pts,born:performance.now(),alpha:.18,kind:'dream'});}
+function update(dt){t+=dt;idle+=dt;for(const d of dust)d.a*=Math.pow(.965,dt/16);dust=dust.filter(d=>d.a>.01);echoes=echoes.filter(e=>performance.now()-e.born<4500);if(idle>3500&&strokes.length&&Math.random()<dt*.00012){spawnDream();idle=0;if(encounters>4)say('it moves when you stop');}}
+function path(points,upto,color,width){if(upto<1)return;ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(points[0].x,points[0].y);for(let i=1;i<Math.min(points.length,upto);i++)ctx.lineTo(points[i].x,points[i].y);ctx.stroke()}
+function draw(){ctx.clearRect(0,0,W,H);const g=ctx.createRadialGradient(W*.5,H*.45,20,W*.5,H*.45,Math.max(W,H)*.82);g.addColorStop(0,'#171224');g.addColorStop(.55,'#0d0a13');g.addColorStop(1,'#050507');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ for(const d of dust){ctx.fillStyle=`rgba(222,214,255,${d.a})`;ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,Math.PI*2);ctx.fill()}
+ const now=performance.now();for(const e of echoes){let elapsed=now-e.born,upto=0;while(upto<e.pts.length&&e.pts[upto].dt<=elapsed)upto++;const fade=Math.max(0,1-elapsed/4500);path(e.pts,upto,e.kind==='dream'?`rgba(151,116,210,${e.alpha*fade})`:`rgba(120,214,210,${e.alpha*fade})`,e.kind==='dream'?1.2:1.7);if(upto>0&&upto<e.pts.length){const q=e.pts[upto-1];ctx.fillStyle=e.kind==='dream'?`rgba(184,145,240,${.5*fade})`:`rgba(144,245,237,${.75*fade})`;ctx.beginPath();ctx.arc(q.x,q.y,e.kind==='dream'?3:4.2,0,Math.PI*2);ctx.fill()}}
+ if(live){path(live,live.length,'rgba(238,230,255,.72)',2.1);const q=live[live.length-1];ctx.strokeStyle='rgba(238,230,255,.32)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(q.x,q.y,10+Math.sin(t*.01)*2,0,Math.PI*2);ctx.stroke()}
+ if(encounters>7){ctx.strokeStyle=`rgba(125,235,222,${.05+.03*Math.sin(t*.002)})`;ctx.lineWidth=1;ctx.beginPath();ctx.arc(W*.5,H*.5,Math.min(W,H)*(.18+.01*Math.sin(t*.001)),0,Math.PI*2);ctx.stroke()}}
+function loop(n){const dt=Math.min(34,n-last||16);last=n;update(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+</script>
+</body>
+</html>
