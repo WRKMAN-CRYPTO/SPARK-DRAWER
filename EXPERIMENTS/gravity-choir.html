@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>Gravity Choir</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080a12;color:#eef;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;touch-action:none}
+  canvas{display:block;width:100%;height:100%}
+  .hud{position:fixed;inset:max(10px,env(safe-area-inset-top)) 12px auto 12px;display:flex;justify-content:space-between;gap:8px;pointer-events:none;font-size:12px;opacity:.82;text-shadow:0 1px 8px #000}
+  .hint{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);font-size:11px;opacity:.58;white-space:nowrap;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud"><span>GRAVITY CHOIR</span><span id="count">0 voices</span></div>
+<div class="hint">tap: add voice · drag: throw · two-finger tap: hush</div>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d'),count=document.getElementById('count');
+let W=0,H=0,dpr=1,balls=[],audio=null,last=performance.now(),active=new Map();
+const TAU=Math.PI*2;
+function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
+addEventListener('resize',resize);resize();
+function ac(){if(!audio) audio=new (window.AudioContext||window.webkitAudioContext)(); if(audio.state==='suspended')audio.resume();return audio}
+function ping(freq,vol=.035,dur=.13){const a=ac(),o=a.createOscillator(),g=a.createGain();o.type='sine';o.frequency.value=freq;g.gain.setValueAtTime(vol,a.currentTime);g.gain.exponentialRampToValueAtTime(.0001,a.currentTime+dur);o.connect(g).connect(a.destination);o.start();o.stop(a.currentTime+dur)}
+function noteFor(x,y,speed=0){const scale=[0,2,4,7,9];const degree=scale[Math.floor((x/W)*scale.length)%scale.length];const oct=Math.max(0,Math.min(2,Math.floor((1-y/H)*3)));const midi=48+degree+12*oct;return 440*Math.pow(2,(midi-69)/12)*(1+Math.min(speed,8)*.003)}
+function addBall(x,y,vx=0,vy=0){if(balls.length>24)balls.shift();balls.push({x,y,vx,vy,r:7+Math.random()*8,m:1+Math.random()*1.8,h:Math.random()*360,age:0,cool:0});count.textContent=balls.length+' voice'+(balls.length===1?'':'s');ping(noteFor(x,y),.025,.11)}
+function hush(){balls.length=0;count.textContent='0 voices';ping(110,.02,.3)}
+function pos(e){return{x:e.clientX,y:e.clientY}}
+c.addEventListener('pointerdown',e=>{c.setPointerCapture(e.pointerId);active.set(e.pointerId,{...pos(e),t:performance.now(),sx:e.clientX,sy:e.clientY});ac()});
+c.addEventListener('pointermove',e=>{const p=active.get(e.pointerId);if(p){p.x=e.clientX;p.y=e.clientY}});
+c.addEventListener('pointerup',e=>{const p=active.get(e.pointerId);if(!p)return;const dt=Math.max(16,performance.now()-p.t),vx=(e.clientX-p.sx)/dt*11,vy=(e.clientY-p.sy)/dt*11;active.delete(e.pointerId);addBall(e.clientX,e.clientY,vx,vy)});
+c.addEventListener('touchstart',e=>{if(e.touches.length===2){e.preventDefault();hush()}},{passive:false});
+function step(dt){
+  for(let i=0;i<balls.length;i++){
+    const a=balls[i];a.age+=dt;a.cool=Math.max(0,a.cool-dt);
+    for(let j=i+1;j<balls.length;j++){
+      const b=balls[j],dx=b.x-a.x,dy=b.y-a.y,d2=dx*dx+dy*dy+70,dist=Math.sqrt(d2),f=Math.min(1700/d2,.32)*dt*60,nx=dx/dist,ny=dy/dist;
+      a.vx+=nx*f*b.m;a.vy+=ny*f*b.m;b.vx-=nx*f*a.m;b.vy-=ny*f*a.m;
+      const rr=a.r+b.r;
+      if(dist<rr){const overlap=rr-dist,rvx=b.vx-a.vx,rvy=b.vy-a.vy,sep=rvx*nx+rvy*ny;if(sep<0){const imp=-sep*.72;a.vx-=nx*imp;a.vy-=ny*imp;b.vx+=nx*imp;b.vy+=ny*imp}a.x-=nx*overlap*.5;a.y-=ny*overlap*.5;b.x+=nx*overlap*.5;b.y+=ny*overlap*.5;if(a.cool<=0&&b.cool<=0){const s=Math.hypot(rvx,rvy);ping(noteFor((a.x+b.x)/2,(a.y+b.y)/2,s),Math.min(.055,.018+s*.004),.09);a.cool=b.cool=.08}}
+    }
+    a.vx*=Math.pow(.997,dt*60);a.vy*=Math.pow(.997,dt*60);a.x+=a.vx*dt*60;a.y+=a.vy*dt*60;
+    if(a.x<a.r){a.x=a.r;a.vx=Math.abs(a.vx)*.86;if(a.cool<=0){ping(noteFor(a.x,a.y,Math.abs(a.vx)),.025);a.cool=.07}}
+    if(a.x>W-a.r){a.x=W-a.r;a.vx=-Math.abs(a.vx)*.86;if(a.cool<=0){ping(noteFor(a.x,a.y,Math.abs(a.vx)),.025);a.cool=.07}}
+    if(a.y<a.r){a.y=a.r;a.vy=Math.abs(a.vy)*.86;if(a.cool<=0){ping(noteFor(a.x,a.y,Math.abs(a.vy)),.025);a.cool=.07}}
+    if(a.y>H-a.r){a.y=H-a.r;a.vy=-Math.abs(a.vy)*.86;if(a.cool<=0){ping(noteFor(a.x,a.y,Math.abs(a.vy)),.025);a.cool=.07}}
+  }
+}
+function draw(){
+  ctx.fillStyle='rgba(8,10,18,.20)';ctx.fillRect(0,0,W,H);
+  ctx.globalCompositeOperation='lighter';
+  for(let i=0;i<balls.length;i++){
+    const a=balls[i];
+    for(let j=i+1;j<balls.length;j++){
+      const b=balls[j],d=Math.hypot(b.x-a.x,b.y-a.y);if(d<150){ctx.strokeStyle=`hsla(${(a.h+b.h)/2},80%,65%,${(1-d/150)*.10})`;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
+    }
+    const g=ctx.createRadialGradient(a.x,a.y,0,a.x,a.y,a.r*3);g.addColorStop(0,`hsla(${a.h},95%,72%,.95)`);g.addColorStop(.22,`hsla(${a.h},90%,62%,.55)`);g.addColorStop(1,`hsla(${a.h},90%,50%,0)`);ctx.fillStyle=g;ctx.beginPath();ctx.arc(a.x,a.y,a.r*3,0,TAU);ctx.fill();
+  }
+  ctx.globalCompositeOperation='source-over';
+  for(const p of active.values()){ctx.strokeStyle='rgba(255,255,255,.18)';ctx.beginPath();ctx.moveTo(p.sx,p.sy);ctx.lineTo(p.x,p.y);ctx.stroke()}
+}
+function loop(t){const dt=Math.min(.035,(t-last)/1000);last=t;step(dt);draw();requestAnimationFrame(loop)}
+ctx.fillStyle='#080a12';ctx.fillRect(0,0,W,H);requestAnimationFrame(loop);
+</script>
+</body>
+</html>
