@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>Pocket Hen</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0f1014;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+#hint{position:fixed;left:0;right:0;bottom:max(18px,env(safe-area-inset-bottom));text-align:center;color:#8d91a0;font:12px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;pointer-events:none;transition:opacity .8s}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas><div id="hint">tap somewhere suspicious</div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d'),hint=document.getElementById('hint');
+let W=0,H=0,dpr=1,last=0,t=0;
+function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;x.setTransform(dpr,0,0,dpr,0,0);}
+addEventListener('resize',resize);resize();
+
+const hen={x:W*.5,y:H*.62,vx:0,vy:0,tx:W*.5,ty:H*.62,state:'idle',facing:1,step:0,panic:0};
+let egg=null, sparkles=[];
+
+function tap(px,py){
+ hint.style.opacity=0;
+ egg={x:px,y:py,age:0,wobble:0};
+ for(let i=0;i<5;i++)sparkles.push({x:px,y:py,vx:(Math.random()-.5)*55,vy:-25-Math.random()*45,a:1});
+ hen.tx=px;hen.ty=py+7;hen.state='panic';hen.panic=.65;
+ const dx=px-hen.x;hen.facing=dx<0?-1:1;
+}
+c.addEventListener('pointerdown',e=>tap(e.clientX,e.clientY));
+
+function update(dt){
+ t+=dt;
+ if(egg)egg.age+=dt;
+ sparkles.forEach(s=>{s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy+=55*dt;s.a-=dt*1.8});
+ sparkles=sparkles.filter(s=>s.a>0);
+ const dx=hen.tx-hen.x,dy=hen.ty-hen.y,d=Math.hypot(dx,dy);
+ if(hen.state==='panic'){
+   if(d>5){const sp=Math.min(190,80+d*1.6);hen.vx=dx/d*sp;hen.vy=dy/d*sp;hen.x+=hen.vx*dt;hen.y+=hen.vy*dt;hen.step+=dt*18;}
+   else{hen.x=hen.tx;hen.y=hen.ty;hen.vx=hen.vy=0;hen.state='sit';hen.step=0;}
+ } else if(hen.state==='sit'){
+   hen.step+=dt*2.5;
+   if(egg && egg.age>4.3){hen.state='idle';hen.tx=Math.max(25,Math.min(W-25,hen.x+(Math.random()-.5)*120));hen.ty=Math.max(45,Math.min(H-35,hen.y+(Math.random()-.5)*70));egg=null;}
+ } else {
+   if(d>4){const sp=18;hen.x+=dx/d*sp*dt;hen.y+=dy/d*sp*dt;hen.step+=dt*5;}
+   else if(Math.random()<dt*.16){hen.tx=Math.max(25,Math.min(W-25,hen.x+(Math.random()-.5)*90));hen.ty=Math.max(45,Math.min(H-35,hen.y+(Math.random()-.5)*55));hen.facing=hen.tx<hen.x?-1:1;}
+ }
+ if(hen.panic>0)hen.panic-=dt;
+}
+
+function pxr(a,b,w,h,col){x.fillStyle=col;x.fillRect(Math.round(a),Math.round(b),w,h)}
+function drawHen(){
+ const s=4, bob=(hen.state==='panic'?Math.sin(hen.step)*2:hen.state==='sit'?Math.sin(hen.step)*.5:Math.sin(hen.step)*1);
+ const X=Math.round(hen.x),Y=Math.round(hen.y+bob),f=hen.facing;
+ // 8-ish pixel creature, scaled blocks: 6 body pixels + eye + beak + two absurd legs.
+ pxr(X-2*s,Y-2*s,4*s,3*s,'#e7dfc8');
+ pxr(X-1*s,Y-3*s,2*s,s,'#f3ead0');
+ pxr(X+f*s,Y-2*s,s,s,'#f6f0de');
+ pxr(X+f*2*s,Y-2*s,s,s,'#d99a3e');
+ pxr(X+f*s,Y-2*s,s,s,'#17181d');
+ // comb becomes alarm antenna during panic
+ if(hen.panic>0){pxr(X,Y-4*s,s,s,'#d45b55');pxr(X-f*s,Y-4*s,s,s,'#d45b55');}
+ else pxr(X,Y-4*s,s,s,'#d45b55');
+ // one-pixel legs. profoundly inadequate, somehow functional.
+ if(hen.state!=='sit'){
+   const kick=Math.sin(hen.step)>0?1:0;
+   pxr(X-s,Y+s*1,s,s*(1+kick),'#b78b4c');
+   pxr(X+s,Y+s*1,s,s*(2-kick),'#b78b4c');
+ }
+}
+function draw(){
+ x.clearRect(0,0,W,H);
+ // floor dust
+ x.globalAlpha=.32;
+ for(let i=0;i<24;i++){let q=(i*83)%W,r=H*.32+((i*47)%Math.max(1,H*.63));pxr(q,r,1,1,'#5b5e6b')}
+ x.globalAlpha=1;
+ if(egg){
+   const pulse=Math.sin(egg.age*5)*.5;
+   x.globalAlpha=.16+Math.max(0,.15-pulse*.05);x.beginPath();x.arc(egg.x,egg.y,13+pulse*2,0,Math.PI*2);x.fillStyle='#f6d985';x.fill();x.globalAlpha=1;
+   pxr(egg.x-3,egg.y-4,6,8,'#f1e6bb');pxr(egg.x-2,egg.y-5,4,1,'#fff7d7');
+ }
+ sparkles.forEach(s=>{x.globalAlpha=Math.max(0,s.a);pxr(s.x,s.y,2,2,'#f4d269')});x.globalAlpha=1;
+ drawHen();
+ if(hen.state==='sit'&&egg){
+   // tiny smugness mark
+   pxr(hen.x+hen.facing*9,hen.y-15,2,1,'#8d91a0');
+ }
+}
+function loop(ms){const now=ms/1000,dt=Math.min(.033,now-last||.016);last=now;update(dt);draw();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script>
+</body></html>
