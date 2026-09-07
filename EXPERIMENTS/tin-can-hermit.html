@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Tin Can Hermit</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0e1320;touch-action:none;font-family:ui-monospace,Menlo,monospace}
+  canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+  .hint{position:fixed;left:0;right:0;bottom:16px;text-align:center;color:#8190aa;font-size:12px;letter-spacing:.08em;pointer-events:none;opacity:.8}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas><div class="hint">tap the floor</div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+let W,H,dpr,ground;
+function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;x.setTransform(dpr,0,0,dpr,0,0);ground=Math.floor(H*.72)}
+addEventListener('resize',resize);resize();
+
+const crab={x:W*.52,y:0,vx:0,dir:1,state:'idle',t:0,target:null,blink:0,carry:false};
+let pebbles=[];
+
+function resetY(){crab.y=ground-7} resetY();
+
+function drop(px){
+  if(px<12||px>W-12)return;
+  pebbles.push({x:px,y:ground-3,age:0,taken:false});
+  if(pebbles.length>7)pebbles.shift();
+  if(crab.state==='idle' || crab.state==='nap') choose();
+}
+
+function choose(){
+  const p=pebbles.filter(p=>!p.taken).sort((a,b)=>Math.abs(a.x-crab.x)-Math.abs(b.x-crab.x))[0];
+  if(!p)return;
+  crab.target=p; crab.state='inspect'; crab.t=0;
+}
+
+c.addEventListener('pointerdown',e=>{drop(e.clientX);});
+
+function update(dt){
+  crab.t+=dt; crab.blink=Math.max(0,crab.blink-dt);
+  for(const p of pebbles)p.age+=dt;
+
+  if(crab.state==='idle'){
+    if(crab.t>1.4+Math.random()*2){
+      crab.t=0;
+      if(Math.random()<.22){crab.state='nap'}
+      else {crab.dir=Math.random()<.5?-1:1;crab.vx=crab.dir*(8+Math.random()*10)}
+    }
+    crab.x+=crab.vx*dt; crab.vx*=.93;
+    if(crab.x<18){crab.x=18;crab.dir=1}
+    if(crab.x>W-18){crab.x=W-18;crab.dir=-1}
+    if(Math.random()<.004)crab.blink=.12;
+    if(pebbles.some(p=>!p.taken)&&Math.random()<.02)choose();
+  }
+  else if(crab.state==='nap'){
+    if(pebbles.some(p=>!p.taken)){crab.state='idle';crab.t=0;choose()}
+    else if(crab.t>3.5){crab.state='idle';crab.t=0}
+  }
+  else if(crab.state==='inspect'){
+    const p=crab.target;
+    if(!p||p.taken){crab.state='idle';crab.t=0;return}
+    const dx=p.x-crab.x; crab.dir=dx<0?-1:1;
+    if(Math.abs(dx)>11){crab.x+=crab.dir*26*dt}
+    else {crab.state='decide';crab.t=0}
+  }
+  else if(crab.state==='decide'){
+    if(crab.t>.55){
+      if(Math.random()<.62){
+        crab.target.taken=true; crab.carry=true; crab.state='flee'; crab.t=0;
+      } else { crab.state='offended'; crab.t=0; }
+    }
+  }
+  else if(crab.state==='offended'){
+    if(crab.t<.18)crab.x-=crab.dir*18*dt;
+    if(crab.t>.65){crab.dir*=-1;crab.state='idle';crab.t=0}
+  }
+  else if(crab.state==='flee'){
+    crab.x+=crab.dir*42*dt;
+    if(crab.t>.9 || crab.x<18 || crab.x>W-18){
+      crab.x=Math.max(18,Math.min(W-18,crab.x)); crab.carry=false;
+      pebbles=pebbles.filter(p=>p!==crab.target); crab.target=null; crab.state='idle';crab.t=0;
+    }
+  }
+}
+
+function rect(px,py,w,h,col){x.fillStyle=col;x.fillRect(Math.round(px),Math.round(py),w,h)}
+
+function drawCrab(){
+  const cx=Math.round(crab.x), cy=ground-8, d=crab.dir;
+  // absurdly small hermit crab: can + face + six one-pixel legs
+  rect(cx-5,cy-4,8,6,'#7f8795');
+  rect(cx-4,cy-5,6,1,'#aab1bb');
+  rect(cx-5,cy+2,8,1,'#4c5564');
+  rect(cx-7*d,cy-1,3,3,'#d98562');
+  if(crab.blink<=0){rect(cx-8*d,cy-1,1,1,'#151820')}
+  rect(cx-8*d,cy-3,1,2,'#d98562');
+  rect(cx-6,cy+3,1,2,'#d98562'); rect(cx-3,cy+3,1,2,'#d98562'); rect(cx,cy+3,1,2,'#d98562');
+  if(crab.state==='nap'){rect(cx-10*d,cy-4,3,1,'#8190aa');rect(cx-11*d,cy-5,1,1,'#8190aa')}
+  if(crab.state==='decide'){rect(cx-10*d,cy-4,1,1,'#e7d7a8')}
+  if(crab.state==='offended'){rect(cx-9*d,cy-3,2,1,'#d98562')}
+  if(crab.carry){rect(cx-10*d,cy+1,3,2,'#c5b98f')}
+}
+
+function draw(){
+  x.clearRect(0,0,W,H);
+  x.fillStyle='#0e1320';x.fillRect(0,0,W,H);
+  // low little night horizon
+  x.fillStyle='#151c2a';x.fillRect(0,ground,W,H-ground);
+  x.fillStyle='#283146';x.fillRect(0,ground,W,1);
+  for(const p of pebbles){if(!p.taken){rect(p.x-2,p.y,4,2,'#c5b98f'); if(p.age<.25)rect(p.x,p.y-3,1,2,'#e7d7a8')}}
+  drawCrab();
+}
+
+let last=performance.now();
+function loop(now){const dt=Math.min(.033,(now-last)/1000);last=now;update(dt);draw();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script>
+</body></html>
