@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<title>Pocket Murmuration</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#070812;touch-action:none;-webkit-user-select:none;user-select:none}
+  canvas{display:block;width:100%;height:100%}
+  #hint{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 18px);text-align:center;color:#cfd3ff88;font:12px/1.4 system-ui,-apple-system,sans-serif;letter-spacing:.08em;pointer-events:none;transition:opacity 1s}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">drag the night around</div>
+<script>
+(() => {
+  const c = document.getElementById('c');
+  const x = c.getContext('2d');
+  const hint = document.getElementById('hint');
+  let W=0,H=0,D=1,t=0,last=0,px=0,py=0,down=false,moved=false;
+  let audio=null;
+
+  function resize(){
+    D=Math.min(2,devicePixelRatio||1); W=innerWidth; H=innerHeight;
+    c.width=W*D; c.height=H*D; c.style.width=W+'px'; c.style.height=H+'px';
+    x.setTransform(D,0,0,D,0,0);
+    if(!px&&!py){px=W*.5;py=H*.5}
+  }
+  addEventListener('resize',resize,{passive:true}); resize();
+
+  const N = Math.max(38, Math.min(90, Math.floor((W*H)/7500)));
+  const birds = Array.from({length:N},(_,i)=>({
+    x:Math.random()*W,y:Math.random()*H,
+    vx:(Math.random()-.5)*1.4,vy:(Math.random()-.5)*1.4,
+    s:1.2+Math.random()*1.8, phase:Math.random()*6.28
+  }));
+  const sparks=[];
+  const ripples=[];
+
+  function point(e){
+    const q=e.touches?e.touches[0]:e; return [q.clientX,q.clientY];
+  }
+  function start(e){
+    e.preventDefault(); [px,py]=point(e); down=true; moved=false; hint.style.opacity=0;
+    if(!audio) try{audio=new (AudioContext||webkitAudioContext)()}catch(_){}
+  }
+  function move(e){
+    if(!down)return; e.preventDefault(); const [nx,ny]=point(e);
+    if(Math.hypot(nx-px,ny-py)>3)moved=true;
+    px=nx;py=ny;
+  }
+  function end(e){
+    if(!down)return; down=false;
+    if(!moved){
+      ripples.push({x:px,y:py,r:4,a:.9});
+      for(let i=0;i<18;i++){
+        const a=Math.random()*Math.PI*2, sp=.4+Math.random()*2.1;
+        sparks.push({x:px,y:py,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:1});
+      }
+      chirp();
+    }
+  }
+  c.addEventListener('pointerdown',start); c.addEventListener('pointermove',move); c.addEventListener('pointerup',end); c.addEventListener('pointercancel',end);
+  c.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
+
+  function chirp(){
+    if(!audio)return;
+    const now=audio.currentTime, o=audio.createOscillator(), g=audio.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(520+Math.random()*170,now); o.frequency.exponentialRampToValueAtTime(900+Math.random()*240,now+.12);
+    g.gain.setValueAtTime(.0001,now); g.gain.exponentialRampToValueAtTime(.035,now+.015); g.gain.exponentialRampToValueAtTime(.0001,now+.18);
+    o.connect(g);g.connect(audio.destination);o.start(now);o.stop(now+.2);
+  }
+
+  function loop(ms){
+    const dt=Math.min(2,(ms-last)/16.67||1); last=ms; t+=.012*dt;
+
+    const bg=x.createRadialGradient(W*.5,H*.45,0,W*.5,H*.45,Math.max(W,H));
+    bg.addColorStop(0,'#11152b'); bg.addColorStop(.55,'#090b18'); bg.addColorStop(1,'#03040a');
+    x.fillStyle=bg; x.fillRect(0,0,W,H);
+
+    // faint dust
+    x.globalAlpha=.34;
+    for(let i=0;i<22;i++){
+      const sx=(i*97.3)%W, sy=(i*173.7)%H;
+      x.fillStyle='#dfe5ff'; x.fillRect(sx,sy,1,1);
+    }
+    x.globalAlpha=1;
+
+    for(let i=0;i<birds.length;i++){
+      const b=birds[i];
+      let ax=0,ay=0,cx=0,cy=0,avx=0,avy=0,n=0;
+      for(let j=0;j<birds.length;j++) if(i!==j){
+        const q=birds[j],dx=q.x-b.x,dy=q.y-b.y,d2=dx*dx+dy*dy;
+        if(d2<6800){
+          n++; cx+=q.x;cy+=q.y;avx+=q.vx;avy+=q.vy;
+          if(d2<380){const d=Math.sqrt(d2)||1; ax-=dx/d*.055;ay-=dy/d*.055}
+        }
+      }
+      if(n){
+        cx=cx/n-b.x; cy=cy/n-b.y; ax+=cx*.00023; ay+=cy*.00023;
+        ax+=(avx/n-b.vx)*.012; ay+=(avy/n-b.vy)*.012;
+      }
+      // touch is a movable gravity well; release and it becomes a soft repeller
+      const dx=px-b.x,dy=py-b.y,d=Math.hypot(dx,dy)||1;
+      if(d<260){
+        const force=down ? .11*(1-d/260) : -.016*(1-d/260);
+        ax+=dx/d*force; ay+=dy/d*force;
+      }
+      ax+=Math.sin(t+b.phase)*.005; ay+=Math.cos(t*.83+b.phase)*.005;
+      b.vx=(b.vx+ax*dt)*.992; b.vy=(b.vy+ay*dt)*.992;
+      const sp=Math.hypot(b.vx,b.vy); if(sp>3.2){b.vx*=3.2/sp;b.vy*=3.2/sp}
+      b.x+=b.vx*dt; b.y+=b.vy*dt;
+      if(b.x<-15)b.x=W+15;if(b.x>W+15)b.x=-15;if(b.y<-15)b.y=H+15;if(b.y>H+15)b.y=-15;
+    }
+
+    // draw connections only where flock is dense
+    x.lineWidth=.55;
+    for(let i=0;i<birds.length;i++) for(let j=i+1;j<birds.length;j++){
+      const a=birds[i],b=birds[j],d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(d<42){x.strokeStyle=`rgba(135,150,255,${(1-d/42)*.10})`;x.beginPath();x.moveTo(a.x,a.y);x.lineTo(b.x,b.y);x.stroke()}
+    }
+
+    for(const b of birds){
+      const ang=Math.atan2(b.vy,b.vx), flap=Math.sin(t*9+b.phase)*.9;
+      x.save();x.translate(b.x,b.y);x.rotate(ang);
+      x.strokeStyle='#e7e9ff';x.lineWidth=1.05;x.globalAlpha=.45+Math.min(.45,Math.hypot(b.vx,b.vy)*.12);
+      x.beginPath();x.moveTo(-b.s*1.4,0);x.quadraticCurveTo(0,-b.s*(1.2+flap*.18),b.s*1.4,0);x.quadraticCurveTo(0,b.s*(.45-flap*.08),-b.s*1.4,0);x.stroke();x.restore();
+    }
+    x.globalAlpha=1;
+
+    for(let i=sparks.length-1;i>=0;i--){
+      const s=sparks[i];s.x+=s.vx*dt;s.y+=s.vy*dt;s.vx*=.985;s.vy*=.985;s.life-=.018*dt;
+      x.globalAlpha=Math.max(0,s.life);x.fillStyle='#d9b8ff';x.beginPath();x.arc(s.x,s.y,1.5*s.life,0,6.28);x.fill();
+      if(s.life<=0)sparks.splice(i,1);
+    }
+    for(let i=ripples.length-1;i>=0;i--){
+      const r=ripples[i];r.r+=2.6*dt;r.a-=.018*dt;
+      x.globalAlpha=Math.max(0,r.a);x.strokeStyle='#b4c6ff';x.lineWidth=1;x.beginPath();x.arc(r.x,r.y,r.r,0,6.28);x.stroke();
+      if(r.a<=0)ripples.splice(i,1);
+    }
+    x.globalAlpha=1;
+
+    if(down){
+      const pulse=12+Math.sin(t*5)*4;
+      x.strokeStyle='#9eb4ff55';x.lineWidth=1;x.beginPath();x.arc(px,py,pulse,0,6.28);x.stroke();
+    }
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
