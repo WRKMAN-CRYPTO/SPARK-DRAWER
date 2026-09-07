@@ -43,7 +43,7 @@
   }
   function start(e){
     e.preventDefault(); [px,py]=point(e); down=true; moved=false; hint.style.opacity=0;
-    if(!audio) try{audio=new (AudioContext||webkitAudioContext)()}catch(_){}
+    if(!audio) try{audio=new (window.AudioContext||window.webkitAudioContext)()}catch(_){}
   }
   function move(e){
     if(!down)return; e.preventDefault(); const [nx,ny]=point(e);
@@ -79,7 +79,6 @@
     bg.addColorStop(0,'#11152b'); bg.addColorStop(.55,'#090b18'); bg.addColorStop(1,'#03040a');
     x.fillStyle=bg; x.fillRect(0,0,W,H);
 
-    // faint dust
     x.globalAlpha=.34;
     for(let i=0;i<22;i++){
       const sx=(i*97.3)%W, sy=(i*173.7)%H;
@@ -101,7 +100,6 @@
         cx=cx/n-b.x; cy=cy/n-b.y; ax+=cx*.00023; ay+=cy*.00023;
         ax+=(avx/n-b.vx)*.012; ay+=(avy/n-b.vy)*.012;
       }
-      // touch is a movable gravity well; release and it becomes a soft repeller
       const dx=px-b.x,dy=py-b.y,d=Math.hypot(dx,dy)||1;
       if(d<260){
         const force=down ? .11*(1-d/260) : -.016*(1-d/260);
@@ -114,7 +112,6 @@
       if(b.x<-15)b.x=W+15;if(b.x>W+15)b.x=-15;if(b.y<-15)b.y=H+15;if(b.y>H+15)b.y=-15;
     }
 
-    // draw connections only where flock is dense
     x.lineWidth=.55;
     for(let i=0;i<birds.length;i++) for(let j=i+1;j<birds.length;j++){
       const a=birds[i],b=birds[j],d=Math.hypot(a.x-b.x,a.y-b.y);
@@ -131,13 +128,13 @@
 
     for(let i=sparks.length-1;i>=0;i--){
       const s=sparks[i];s.x+=s.vx*dt;s.y+=s.vy*dt;s.vx*=.985;s.vy*=.985;s.life-=.018*dt;
-      x.globalAlpha=Math.max(0,s.life);x.fillStyle='#d9b8ff';x.beginPath();x.arc(s.x,s.y,1.5*s.life,0,6.28);x.fill();
-      if(s.life<=0)sparks.splice(i,1);
+      if(s.life<=0){sparks.splice(i,1);continue;}
+      x.globalAlpha=s.life;x.fillStyle='#d9b8ff';x.beginPath();x.arc(s.x,s.y,1.5*s.life,0,6.28);x.fill();
     }
     for(let i=ripples.length-1;i>=0;i--){
       const r=ripples[i];r.r+=2.6*dt;r.a-=.018*dt;
-      x.globalAlpha=Math.max(0,r.a);x.strokeStyle='#b4c6ff';x.lineWidth=1;x.beginPath();x.arc(r.x,r.y,r.r,0,6.28);x.stroke();
-      if(r.a<=0)ripples.splice(i,1);
+      if(r.a<=0){ripples.splice(i,1);continue;}
+      x.globalAlpha=r.a;x.strokeStyle='#b4c6ff';x.lineWidth=1;x.beginPath();x.arc(r.x,r.y,r.r,0,6.28);x.stroke();
     }
     x.globalAlpha=1;
 
