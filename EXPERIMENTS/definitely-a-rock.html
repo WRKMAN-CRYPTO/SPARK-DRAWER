@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Definitely A Rock</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#171916;color:#ddd8c7;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;touch-action:none}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+.label{position:fixed;left:12px;top:10px;font-size:12px;letter-spacing:.08em;opacity:.45;pointer-events:none}
+.hint{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);font-size:11px;opacity:.28;white-space:nowrap;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="label">DEFINITELY A ROCK</div>
+<div class="hint">inspect the rock.</div>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+let W=0,H=0,dpr=1,last=performance.now(),pointer={x:-999,y:-999,down:false};
+const rock={x:0,y:0,vx:0,vy:0,state:'rock',timer:0,dir:1,blink:0,panic:0,settleX:0,settleY:0};
+let dust=[];
+function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);if(!rock.x){rock.x=W*.52;rock.y=H*.62;rock.settleX=rock.x;rock.settleY=rock.y}}
+addEventListener('resize',resize);resize();
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function disturb(px,py){pointer.x=px;pointer.y=py;const d=Math.hypot(px-rock.x,py-rock.y);if(d<105&&rock.state==='rock'){rock.state='realize';rock.timer=.26;rock.dir=px<rock.x?1:-1;rock.panic=1}}
+c.addEventListener('pointerdown',e=>{pointer.down=true;disturb(e.clientX,e.clientY)});
+c.addEventListener('pointermove',e=>{pointer.x=e.clientX;pointer.y=e.clientY;if(e.pointerType==='mouse'||e.buttons)disturb(e.clientX,e.clientY)});
+c.addEventListener('pointerup',()=>pointer.down=false);
+c.addEventListener('pointercancel',()=>pointer.down=false);
+function puff(){for(let i=0;i<5;i++)dust.push({x:rock.x+(Math.random()-.5)*8,y:rock.y+7,vx:(Math.random()-.5)*35,vy:-8-Math.random()*18,t:.45+Math.random()*.25})}
+function update(dt){
+ rock.timer-=dt;rock.blink-=dt;rock.panic=Math.max(0,rock.panic-dt*2.2);
+ if(rock.blink<-2.5-Math.random()*3)rock.blink=.1;
+ if(rock.state==='realize'&&rock.timer<=0){rock.state='run';rock.timer=.75+Math.random()*.45;rock.vx=rock.dir*(70+Math.random()*35);puff()}
+ if(rock.state==='run'){
+   const near=Math.hypot(pointer.x-rock.x,pointer.y-rock.y)<110;
+   if(near){rock.dir=pointer.x<rock.x?1:-1;rock.vx+=rock.dir*dt*220;rock.timer=Math.max(rock.timer,.35)}
+   rock.vx+=rock.dir*dt*55;
+   if(Math.random()<dt*7)puff();
+   if(rock.timer<=0){rock.state='check';rock.timer=.38;rock.vx*=.3}
+ }
+ if(rock.state==='check'&&rock.timer<=0){
+   if(Math.hypot(pointer.x-rock.x,pointer.y-rock.y)<95){rock.state='run';rock.timer=.55;rock.dir=pointer.x<rock.x?1:-1}
+   else{rock.state='settle';rock.timer=.48;rock.settleX=rock.x;rock.settleY=rock.y}
+ }
+ if(rock.state==='settle'&&rock.timer<=0){rock.state='rock';rock.vx=0;rock.vy=0}
+ rock.vx*=Math.pow(.12,dt);rock.x+=rock.vx*dt;rock.y+=rock.vy*dt;
+ if(rock.x<18){rock.x=18;rock.dir=1;rock.vx=Math.abs(rock.vx)}
+ if(rock.x>W-18){rock.x=W-18;rock.dir=-1;rock.vx=-Math.abs(rock.vx)}
+ rock.y=clamp(rock.y,50,H-28);
+ dust.forEach(d=>{d.x+=d.vx*dt;d.y+=d.vy*dt;d.vy+=30*dt;d.vx*=.94;d.t-=dt});dust=dust.filter(d=>d.t>0);
+}
+function px(x,y,w=2,h=2,col='#8c8f7b'){ctx.fillStyle=col;ctx.fillRect(Math.round(x),Math.round(y),w,h)}
+function drawRock(){
+ const r=rock;ctx.save();ctx.translate(Math.round(r.x),Math.round(r.y));
+ if(r.state==='rock'){
+   px(-7,-5,14,10,'#777b6d');px(-5,-7,9,2,'#858a7a');px(-8,-2,2,5,'#62665c');px(3,-4,3,2,'#929786');px(-3,3,7,2,'#676b60');
+ } else {
+   const running=r.state==='run';const step=running?Math.sin(performance.now()/48)*2:0;
+   px(-7,-5,14,10,'#777b6d');px(-5,-7,9,2,'#858a7a');px(-8,-2,2,5,'#62665c');px(3,-4,3,2,'#929786');
+   px(-6,5+step,2,4,'#a49f82');px(4,5-step,2,4,'#a49f82');
+   px(-3,5-step,2,3,'#8e896f');px(1,5+step,2,3,'#8e896f');
+   const face=r.dir>0?1:-1;
+   if(r.blink>0){px(face>0?5:-6,-2,2,1,'#1c1d1a')}else{px(face>0?5:-6,-3,2,2,'#1c1d1a')}
+   if(r.state==='realize'){px(face>0?7:-9,-1,1,2,'#d5cfa8')}
+   if(r.state==='check'){
+     px(face>0?-1:-3,-9,1,3,'#a49f82');px(face>0?2:0,-9,1,3,'#a49f82');
+   }
+ }
+ ctx.restore();
+}
+function draw(){
+ ctx.clearRect(0,0,W,H);ctx.fillStyle='#171916';ctx.fillRect(0,0,W,H);
+ ctx.fillStyle='#1e211d';ctx.fillRect(0,H*.74,W,H*.26);
+ for(let i=0;i<30;i++){const xx=(i*79+17)%W,yy=H*.74+((i*43)%Math.max(1,H*.26));px(xx,yy,1,1,'#292d27')}
+ dust.forEach(d=>{ctx.globalAlpha=Math.max(0,d.t/.7);px(d.x,d.y,2,2,'#6f715f');ctx.globalAlpha=1});
+ drawRock();
+}
+function loop(t){const dt=Math.min(.033,(t-last)/1000);last=t;update(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+</script>
+</body>
+</html>
