@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>Lonely Dot</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#efe9dc;touch-action:none;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+.label{position:fixed;left:0;right:0;top:max(16px,env(safe-area-inset-top));text-align:center;color:#34322d;font-size:12px;letter-spacing:.18em;text-transform:uppercase;opacity:.68;pointer-events:none}
+.hint{position:fixed;left:0;right:0;bottom:max(18px,env(safe-area-inset-bottom));text-align:center;color:#34322d;font-size:11px;opacity:.42;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="label">LONELY DOT</div>
+<div class="hint">tap somewhere · maybe it will trust you</div>
+<script>
+const c=document.getElementById('c'),g=c.getContext('2d');
+let w=0,h=0,dpr=1,t=0;
+let friend={x:0,y:0,alive:false,age:0};
+let dot={x:0,y:0,vx:0,vy:0,mood:0,hope:0};
+function resize(){dpr=Math.min(devicePixelRatio||1,2);w=innerWidth;h=innerHeight;c.width=w*dpr;c.height=h*dpr;g.setTransform(dpr,0,0,dpr,0,0);g.imageSmoothingEnabled=false;if(!dot.x){dot.x=w*.5;dot.y=h*.58}}
+addEventListener('resize',resize);resize();
+function snap(v,s=5){return Math.round(v/s)*s}
+function spawn(e){let q=e.touches?e.touches[0]:e;friend.x=q.clientX;friend.y=q.clientY;friend.alive=true;friend.age=0;if(navigator.vibrate)navigator.vibrate(4)}
+c.addEventListener('pointerdown',spawn);c.addEventListener('touchstart',e=>{e.preventDefault();spawn(e)},{passive:false});
+function update(){
+ t++;if(friend.alive)friend.age++;
+ let dx=friend.x-dot.x,dy=friend.y-dot.y,d=Math.hypot(dx,dy)||1;
+ if(friend.alive){
+   if(d>34){dot.vx+=dx/d*.025;dot.vy+=dy/d*.025;dot.hope=Math.min(1,dot.hope+.01)}
+   else {dot.vx*=.85;dot.vy*=.85;dot.hope=Math.min(1,dot.hope+.02)}
+   if(friend.age>240){friend.alive=false;dot.mood=1;dot.hope=0}
+ } else {
+   dot.mood=Math.max(0,dot.mood-.004);dot.hope=Math.max(0,dot.hope-.003);
+   dot.vx+=Math.sin(t*.013)*.002;dot.vy+=Math.cos(t*.017)*.002;
+ }
+ dot.vx*=.94;dot.vy*=.94;dot.x+=dot.vx;dot.y+=dot.vy;
+ if(dot.x<16){dot.x=16;dot.vx=Math.abs(dot.vx)}if(dot.x>w-16){dot.x=w-16;dot.vx=-Math.abs(dot.vx)}
+ if(dot.y<48){dot.y=48;dot.vy=Math.abs(dot.vy)}if(dot.y>h-24){dot.y=h-24;dot.vy=-Math.abs(dot.vy)}
+}
+function draw(){
+ g.fillStyle='#efe9dc';g.fillRect(0,0,w,h);
+ if(friend.alive){
+   g.fillStyle='rgba(170,92,65,.28)';g.fillRect(snap(friend.x)-5,snap(friend.y)-5,10,10);
+   g.fillStyle='rgba(170,92,65,.65)';g.fillRect(snap(friend.x),snap(friend.y),5,5);
+ }
+ // the entire creature is one square and one optional eye pixel
+ g.fillStyle='#30312e';g.fillRect(snap(dot.x)-5,snap(dot.y)-5,10,10);
+ if(friend.alive){
+   let eyeX=friend.x<dot.x?-5:5;
+   g.fillStyle='#efe9dc';g.fillRect(snap(dot.x)+eyeX,snap(dot.y)-5,5,5);
+ }
+ if(dot.hope>.75&&friend.alive&&Math.hypot(friend.x-dot.x,friend.y-dot.y)<40){
+   g.fillStyle='rgba(48,49,46,.4)';g.font='10px ui-monospace,monospace';g.textAlign='center';g.fillText('stay?',dot.x,dot.y-22);
+ }
+ if(dot.mood>.35&&!friend.alive){
+   g.fillStyle='rgba(48,49,46,'+(dot.mood*.25)+')';g.fillRect(snap(dot.x),snap(dot.y)+10,5,5);
+ }
+}
+function loop(){update();draw();requestAnimationFrame(loop)}loop();
+</script>
+</body>
+</html>
