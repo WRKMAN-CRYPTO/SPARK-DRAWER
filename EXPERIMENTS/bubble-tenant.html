@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>Bubble Tenant</title>
+<style>
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#08111f;touch-action:none;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  canvas{display:block;width:100%;height:100%}
+  .hint{position:fixed;left:0;right:0;bottom:max(14px,env(safe-area-inset-bottom));text-align:center;color:#8ea3bb;font-size:12px;letter-spacing:.08em;pointer-events:none;opacity:.72}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hint">DRAG THE BUBBLE · FLICK IT IF YOU'RE RUDE</div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+let W=0,H=0,D=1,last=performance.now(),drag=false,pid=null;
+let bx=0,by=0,bvx=0,bvy=0,br=58,px=0,py=0,pvx=0,pvy=0,grabX=0,grabY=0,prevX=0,prevY=0,prevT=0;
+let popped=false,popT=0,blink=0,blinkAt=2+Math.random()*3,look=0;
+const stars=Array.from({length:42},()=>({x:Math.random(),y:Math.random(),s:Math.random()<.8?1:2,a:.15+Math.random()*.55}));
+function resize(){D=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*D;c.height=H*D;c.style.width=W+'px';c.style.height=H+'px';x.setTransform(D,0,0,D,0,0);if(!bx){bx=W*.5;by=H*.42;}}
+addEventListener('resize',resize);resize();
+function pointerPos(e){return{x:e.clientX,y:e.clientY}}
+c.addEventListener('pointerdown',e=>{let p=pointerPos(e);if(!popped&&Math.hypot(p.x-bx,p.y-by)<br*1.18){drag=true;pid=e.pointerId;c.setPointerCapture(pid);grabX=p.x-bx;grabY=p.y-by;prevX=p.x;prevY=p.y;prevT=performance.now();bvx=bvy=0;}});
+c.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==pid)return;let p=pointerPos(e),t=performance.now(),dt=Math.max(8,t-prevT)/1000;let nx=p.x-grabX,ny=p.y-grabY;bvx=(nx-bx)/dt*.24;bvy=(ny-by)/dt*.24;bx=nx;by=ny;prevX=p.x;prevY=p.y;prevT=t;});
+function up(e){if(e.pointerId===pid){drag=false;pid=null;}}
+c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up);
+function pop(){if(popped)return;popped=true;popT=0;drag=false;bvx=bvy=0;pvx*=1.2;pvy-=30;}
+function resetBubble(){popped=false;popT=0;br=18;bx=Math.max(70,Math.min(W-70,bx));by=Math.max(90,Math.min(H-90,by));bvx=0;bvy=-20;}
+function update(dt){
+  blinkAt-=dt;if(blinkAt<=0){blink=.13;blinkAt=2+Math.random()*4;}blink=Math.max(0,blink-dt);
+  if(!popped){
+    if(!drag){bvy+=18*dt;bvx*=Math.pow(.992,dt*60);bvy*=Math.pow(.995,dt*60);bx+=bvx*dt;by+=bvy*dt;}
+    if(br<58)br=Math.min(58,br+72*dt);
+    let hit=Math.hypot(bvx,bvy)>760;
+    if(bx<br){bx=br;bvx=Math.abs(bvx)*.72;if(hit)pop();}
+    if(bx>W-br){bx=W-br;bvx=-Math.abs(bvx)*.72;if(hit)pop();}
+    if(by<br){by=br;bvy=Math.abs(bvy)*.72;if(hit)pop();}
+    if(by>H-br){by=H-br;bvy=-Math.abs(bvy)*.72;if(hit)pop();}
+    // the tenant lags behind the bubble center, then swims back toward it
+    pvx+=(bx-px)*8.5*dt;pvy+=(by-py)*8.5*dt;pvx*=Math.pow(.82,dt*60);pvy*=Math.pow(.82,dt*60);px+=pvx*dt;py+=pvy*dt;
+    let dx=px-bx,dy=py-by,d=Math.hypot(dx,dy),lim=br-16;if(d>lim){px=bx+dx/d*lim;py=by+dy/d*lim;pvx*=-.3;pvy*=-.3;}
+    if(!px){px=bx;py=by;}
+  }else{
+    popT+=dt;pvy+=380*dt;px+=pvx*dt;py+=pvy*dt;pvx*=Math.pow(.985,dt*60);
+    if(py>H-25){py=H-25;pvy*=-.22;pvx*=.72;}
+    if(px<12){px=12;pvx=Math.abs(pvx)*.4} if(px>W-12){px=W-12;pvx=-Math.abs(pvx)*.4}
+    if(popT>1.15&&popT<1.22)look=1;
+    look=Math.max(0,look-dt*.5);
+    if(popT>2.35){bx=px;by=py-2;resetBubble();}
+  }
+}
+function tenant(cx,cy){
+  x.save();x.translate(Math.round(cx),Math.round(cy));
+  const squish=Math.min(2,Math.hypot(pvx,pvy)/180);x.rotate(Math.atan2(pvy,pvx)*.05);
+  x.fillStyle='#1b2838';x.fillRect(-8,-5,16,10);x.fillRect(-6,-8,12,16);
+  x.fillStyle='#d9e7f2';
+  if(blink>0){x.fillRect(-5,-2,3,1);x.fillRect(2,-2,3,1);}else{ x.fillRect(-5,-3,3,3);x.fillRect(2,-3,3,3);x.fillStyle='#08111f';x.fillRect(-4+(look>.4?1:0),-2,1,1);x.fillRect(3+(look>.4?1:0),-2,1,1); }
+  x.fillStyle='#9fb0c1';x.fillRect(-3,4,6,1);
+  // two absurdly economical feet
+  x.fillStyle='#1b2838';x.fillRect(-7,7+squish,3,2);x.fillRect(4,7-squish,3,2);
+  x.restore();
+}
+function draw(){
+  x.clearRect(0,0,W,H);x.fillStyle='#08111f';x.fillRect(0,0,W,H);
+  for(const s of stars){x.globalAlpha=s.a;x.fillStyle='#a6c8e8';x.fillRect(Math.floor(s.x*W),Math.floor(s.y*H),s.s,s.s)}x.globalAlpha=1;
+  if(!popped){
+    x.beginPath();x.arc(bx,by,br,0,Math.PI*2);x.fillStyle='rgba(105,190,255,.055)';x.fill();x.lineWidth=2;x.strokeStyle='rgba(170,225,255,.68)';x.stroke();
+    x.beginPath();x.arc(bx-br*.28,by-br*.3,br*.46,3.4,4.8);x.lineWidth=3;x.strokeStyle='rgba(255,255,255,.75)';x.stroke();
+    x.beginPath();x.arc(bx+br*.2,by+br*.28,br*.66,.25,1.05);x.lineWidth=1;x.strokeStyle='rgba(121,255,224,.45)';x.stroke();
+  } else if(popT<.28){
+    let r=br+popT*180;x.globalAlpha=1-popT/.28;x.beginPath();x.arc(bx,by,r,0,Math.PI*2);x.strokeStyle='#a9e7ff';x.lineWidth=2;x.stroke();x.globalAlpha=1;
+    for(let i=0;i<9;i++){let a=i*Math.PI*2/9+.25,rr=br+popT*300;x.fillStyle='#bdefff';x.fillRect(bx+Math.cos(a)*rr,by+Math.sin(a)*rr,2,2)}
+  }
+  tenant(px,py);
+  if(popped&&popT>.75&&popT<2.25){x.textAlign='center';x.font='10px ui-monospace,monospace';x.fillStyle=`rgba(160,180,198,${Math.min(1,(popT-.75)*2)})`;x.fillText(popT<1.45?'...':'seriously?',px,py-24)}
+}
+function frame(t){let dt=Math.min(.033,(t-last)/1000);last=t;update(dt);draw();requestAnimationFrame(frame)}
+px=bx;py=by;requestAnimationFrame(frame);
+</script>
+</body>
+</html>
