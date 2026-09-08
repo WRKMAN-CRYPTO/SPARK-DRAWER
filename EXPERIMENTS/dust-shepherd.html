@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<title>Dust Shepherd</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#17140f;touch-action:none}
+  canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+  .label{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top) + 14px);text-align:center;color:#c9b894;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;pointer-events:none;opacity:.72}
+  .hint{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 18px);text-align:center;color:#8f836c;font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;pointer-events:none;opacity:.62}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="label">DUST SHEPHERD</div>
+<div class="hint">drag through his pile. see what happens.</div>
+<script>
+const c=document.querySelector('#c'),x=c.getContext('2d');
+let w,h,dpr=Math.min(devicePixelRatio||1,2),last=performance.now(),t=0;
+const pointer={x:0,y:0,down:false,seen:false};
+const dust=[];
+const sheep={x:0,y:0,vx:0,vy:0,blink:0,annoyed:0,target:null};
+function resize(){w=innerWidth;h=innerHeight;c.width=w*dpr;c.height=h*dpr;x.setTransform(dpr,0,0,dpr,0,0);if(!sheep.x){sheep.x=w*.52;sheep.y=h*.58;pointer.x=w*.5;pointer.y=h*.5} if(!dust.length) seed();}
+function seed(){dust.length=0;for(let i=0;i<34;i++){let a=Math.random()*Math.PI*2,r=Math.sqrt(Math.random())*55;dust.push({x:w*.5+Math.cos(a)*r,y:h*.54+Math.sin(a)*r,vx:0,vy:0,s:Math.random()<.22?2:1});}}
+addEventListener('resize',resize);resize();
+function setP(e){const q=e.touches?e.touches[0]:e;pointer.x=q.clientX;pointer.y=q.clientY;pointer.seen=true;}
+c.addEventListener('pointerdown',e=>{pointer.down=true;setP(e)});c.addEventListener('pointermove',setP);addEventListener('pointerup',()=>pointer.down=false);
+c.addEventListener('touchstart',e=>setP(e),{passive:true});c.addEventListener('touchmove',e=>setP(e),{passive:true});
+function chooseDust(){let best=null,score=-1;for(const d of dust){let dx=d.x-w*.5,dy=d.y-h*.54,far=Math.hypot(dx,dy);if(far>score){score=far;best=d}}return best;}
+function step(dt){t+=dt;
+  if(pointer.seen){for(const d of dust){let dx=d.x-pointer.x,dy=d.y-pointer.y,rr=Math.hypot(dx,dy);if(rr<46){let f=(46-rr)/46*(pointer.down?650:230);if(rr<1)rr=1;d.vx+=dx/rr*f*dt;d.vy+=dy/rr*f*dt;if(rr<28)sheep.annoyed=Math.min(1,sheep.annoyed+dt*1.8);}}}
+  for(const d of dust){d.vx*=Math.pow(.09,dt);d.vy*=Math.pow(.09,dt);d.x+=d.vx*dt;d.y+=d.vy*dt;d.x=Math.max(5,Math.min(w-5,d.x));d.y=Math.max(40,Math.min(h-5,d.y));}
+  sheep.annoyed=Math.max(0,sheep.annoyed-dt*.2);
+  if(!sheep.target || Math.hypot(sheep.target.x-w*.5,sheep.target.y-h*.54)<24 || Math.random()<dt*.45) sheep.target=chooseDust();
+  let tx=w*.5,ty=h*.54;
+  if(sheep.target){let d=sheep.target;let ox=d.x-w*.5,oy=d.y-h*.54,rr=Math.hypot(ox,oy)||1;tx=d.x+ox/rr*13;ty=d.y+oy/rr*13;}
+  let dx=tx-sheep.x,dy=ty-sheep.y,rr=Math.hypot(dx,dy)||1;let speed=sheep.annoyed>.4?82:55;
+  sheep.vx+=(dx/rr*speed-sheep.vx)*Math.min(1,dt*4);sheep.vy+=(dy/rr*speed-sheep.vy)*Math.min(1,dt*4);sheep.x+=sheep.vx*dt;sheep.y+=sheep.vy*dt;
+  if(sheep.target && Math.hypot(sheep.target.x-sheep.x,sheep.target.y-sheep.y)<17){let d=sheep.target,dx=w*.5-d.x,dy=h*.54-d.y,rr=Math.hypot(dx,dy)||1;d.vx+=dx/rr*32;d.vy+=dy/rr*32;}
+  sheep.blink-=dt;if(sheep.blink<-Math.random()*2.8)sheep.blink=.12;
+}
+function drawPixelBug(){let px=Math.round(sheep.x),py=Math.round(sheep.y),dir=sheep.vx>=0?1:-1;
+  x.fillStyle='#5b4a31';x.fillRect(px-4,py-2,8,5);x.fillRect(px-2,py-4,5,3);
+  x.fillStyle='#8b744d';x.fillRect(px-3,py-3,5,4);
+  x.fillStyle='#201a12'; if(sheep.blink<=0){x.fillRect(px+(dir>0?2:-3),py-3,1,1);} 
+  x.fillStyle=sheep.annoyed>.45?'#b16c42':'#6b5a3c';
+  x.fillRect(px-5,py+3,2,1);x.fillRect(px+3,py+3,2,1);x.fillRect(px-5,py-1,2,1);x.fillRect(px+3,py-1,2,1);
+  if(sheep.annoyed>.45){x.fillStyle='#b16c42';x.fillRect(px+(dir>0?1:-2),py-5,3,1);}
+}
+function render(){x.clearRect(0,0,w,h);
+  const g=x.createRadialGradient(w*.5,h*.53,10,w*.5,h*.53,Math.max(w,h)*.7);g.addColorStop(0,'#211d16');g.addColorStop(1,'#11100d');x.fillStyle=g;x.fillRect(0,0,w,h);
+  x.fillStyle='#8b806b';for(const d of dust)x.fillRect(Math.round(d.x),Math.round(d.y),d.s,d.s);
+  x.strokeStyle='rgba(185,160,115,.08)';x.beginPath();x.arc(w*.5,h*.54,30,0,Math.PI*2);x.stroke();
+  drawPixelBug();
+  if(sheep.annoyed>.7){x.fillStyle='rgba(201,184,148,.68)';x.font='10px ui-monospace,monospace';x.textAlign='center';x.fillText('hey.',sheep.x,sheep.y-13);}
+}
+function loop(now){let dt=Math.min(.033,(now-last)/1000);last=now;step(dt);render();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+</script>
+</body></html>
