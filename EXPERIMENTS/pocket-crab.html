@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<title>Pocket Crab</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#071017;touch-action:none;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#9eb2bd}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+#hint{position:fixed;left:0;right:0;bottom:calc(18px + env(safe-area-inset-bottom));text-align:center;font-size:11px;letter-spacing:.08em;opacity:.45;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas><div id="hint">tap near him. not on him.</div>
+<script>
+const c=document.querySelector('#c'),x=c.getContext('2d');let W,H,dpr;
+function size(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;x.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',size);size();
+const crab={x:W*.5,y:H*.62,vx:0,dir:1,mood:0,blink:0,panic:0,loot:0};
+let taps=[],t=0,last=performance.now();
+function tap(e){const p=e.touches?e.touches[0]:e;const dx=p.clientX-crab.x,dy=p.clientY-crab.y,d=Math.hypot(dx,dy);taps.push({x:p.clientX,y:p.clientY,a:1});if(d<34){crab.panic=1;crab.vx+=(dx>0?-1:1)*130;crab.mood=-1}else if(d<150){crab.dir=dx>0?1:-1;crab.vx+=crab.dir*75;crab.mood=1;if(Math.random()<.42)crab.loot=1}}
+c.addEventListener('pointerdown',tap);
+function rect(px,py,w,h,col){x.fillStyle=col;x.fillRect(Math.round(px),Math.round(py),w,h)}
+function drawCrab(){const s=3,px=Math.round(crab.x/3)*3,py=Math.round(crab.y/3)*3,d=crab.dir;
+  // shadow
+  rect(px-15,py+11,30,3,'#02070a');
+  // legs
+  const leg='#c8664a';rect(px-15,py+5,6,3,leg);rect(px+9,py+5,6,3,leg);rect(px-12,py+8,3,3,leg);rect(px+9,py+8,3,3,leg);
+  // claws
+  rect(px-18,py-1,6,6,leg);rect(px+12,py-1,6,6,leg);rect(px-21,py+2,3,3,leg);rect(px+18,py+2,3,3,leg);
+  // body
+  rect(px-9,py,18,9,'#e47a58');rect(px-6,py-3,12,3,'#e47a58');
+  // eyes
+  if(crab.blink<.09){rect(px-6,py-4,3,1,'#071017');rect(px+3,py-4,3,1,'#071017')}else{rect(px-6,py-6,3,3,'#d8f4ef');rect(px+3,py-6,3,3,'#d8f4ef');rect(px-5+d,py-5,1,1,'#071017');rect(px+4+d,py-5,1,1,'#071017')}
+  // tiny stolen shiny thing
+  if(crab.loot){const lx=px-d*17;rect(lx,py-7,3,3,'#f4e68a');rect(lx+d*3,py-10,1,1,'#fff8cf')}
+  // mood eyebrow when offended
+  if(crab.mood<0){rect(px-7,py-9,4,1,'#7f3428');rect(px+3,py-9,4,1,'#7f3428')}
+}
+function frame(now){const dt=Math.min((now-last)/1000,.033);last=now;t+=dt;
+  crab.blink=(Math.sin(t*1.7)+1)/2;crab.panic=Math.max(0,crab.panic-dt*1.6);crab.vx*=Math.pow(.035,dt);crab.x+=crab.vx*dt;
+  if(Math.abs(crab.vx)<4 && Math.random()<dt*.22){crab.dir=Math.random()<.5?-1:1;crab.vx=crab.dir*(8+Math.random()*10)}
+  if(crab.x<28){crab.x=28;crab.dir=1;crab.vx=Math.abs(crab.vx)}if(crab.x>W-28){crab.x=W-28;crab.dir=-1;crab.vx=-Math.abs(crab.vx)}
+  crab.y=H*.62+Math.sin(t*3)*1.2;
+  x.clearRect(0,0,W,H);
+  // floor specks
+  for(let i=0;i<18;i++){const sx=(i*73.31)%W,sy=H*.62+18+((i*37)%90);rect(sx,sy,1,1,'#17303a')}
+  for(const q of taps){q.a-=dt*1.8;x.strokeStyle=`rgba(167,214,219,${Math.max(0,q.a)*.35})`;x.lineWidth=1;x.beginPath();x.arc(q.x,q.y,(1-q.a)*20+3,0,7);x.stroke()}taps=taps.filter(q=>q.a>0);
+  drawCrab();requestAnimationFrame(frame)}requestAnimationFrame(frame);
+</script>
+</body></html>
