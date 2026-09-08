@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<title>Pocket Firefly</title>
+<style>
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#070a0c;touch-action:none;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  canvas{display:block;width:100%;height:100%}
+  .hint{position:fixed;left:0;right:0;bottom:max(18px,env(safe-area-inset-bottom));text-align:center;color:#59656a;font-size:12px;letter-spacing:.12em;pointer-events:none;transition:opacity 1s}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hint" id="hint">TOUCH THE DARK</div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d'),hint=document.getElementById('hint');
+let W=0,H=0,D=1,t=0,last=0;
+let touches=[];
+let bug={x:0,y:0,vx:0,vy:0,tx:0,ty:0,phase:0,brave:0,startled:0,rest:0};
+function resize(){D=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*D;c.height=H*D;x.setTransform(D,0,0,D,0,0);if(!bug.x){bug.x=W*.5;bug.y=H*.46;pick();}}
+addEventListener('resize',resize);resize();
+function pick(){
+  bug.tx=30+Math.random()*(W-60);bug.ty=40+Math.random()*(H-120);bug.rest=.7+Math.random()*1.8;
+}
+function light(px,py,power=1){touches.push({x:px,y:py,life:1,power});hint.style.opacity=0;}
+function pointer(e){light(e.clientX,e.clientY,1)}
+addEventListener('pointerdown',pointer,{passive:true});
+addEventListener('pointermove',e=>{if(e.buttons)light(e.clientX,e.clientY,.45)},{passive:true});
+function nearestLight(){
+ let best=null,bd=1e9;
+ for(const q of touches){if(q.life<=0)continue;const dx=q.x-bug.x,dy=q.y-bug.y,d=dx*dx+dy*dy;if(d<bd){bd=d;best=q;}}
+ return best?{q:best,d:Math.sqrt(bd)}:null;
+}
+function update(dt){
+ t+=dt; touches.forEach(q=>q.life-=dt*(q.power<.6?1.8:.75)); touches=touches.filter(q=>q.life>0);
+ bug.phase+=dt*(3+Math.hypot(bug.vx,bug.vy)*.04);
+ const n=nearestLight();
+ let ax=0,ay=0;
+ if(bug.startled>0){bug.startled-=dt; ax=(bug.x-W/2)*.003; ay=(bug.y-H/2)*.003;}
+ else if(n && n.d<72){
+   const dx=bug.x-n.q.x,dy=bug.y-n.q.y,m=n.d||1; ax+=dx/m*.95;ay+=dy/m*.95;bug.startled=.38;bug.brave=Math.max(0,bug.brave-.1);
+ }
+ else if(n && n.d<260){
+   const dx=n.q.x-bug.x,dy=n.q.y-bug.y,m=n.d||1;
+   const pull=.22+.42*bug.brave; ax+=dx/m*pull;ay+=dy/m*pull; bug.brave=Math.min(1,bug.brave+dt*.08);
+ } else {
+   bug.rest-=dt;
+   if(bug.rest<=0 || Math.hypot(bug.tx-bug.x,bug.ty-bug.y)<18)pick();
+   const dx=bug.tx-bug.x,dy=bug.ty-bug.y,m=Math.hypot(dx,dy)||1;ax+=dx/m*.07;ay+=dy/m*.07;bug.brave=Math.max(0,bug.brave-dt*.025);
+ }
+ bug.vx=(bug.vx+ax*60*dt)*Math.pow(.88,dt*60);bug.vy=(bug.vy+ay*60*dt)*Math.pow(.88,dt*60);
+ const sp=Math.hypot(bug.vx,bug.vy),cap=2.1;if(sp>cap){bug.vx*=cap/sp;bug.vy*=cap/sp}
+ bug.x+=bug.vx*60*dt;bug.y+=bug.vy*60*dt;
+ if(bug.x<10){bug.x=10;bug.vx=Math.abs(bug.vx)} if(bug.x>W-10){bug.x=W-10;bug.vx=-Math.abs(bug.vx)}
+ if(bug.y<10){bug.y=10;bug.vy=Math.abs(bug.vy)} if(bug.y>H-30){bug.y=H-30;bug.vy=-Math.abs(bug.vy)}
+}
+function glow(px,py,r,a){const g=x.createRadialGradient(px,py,0,px,py,r);g.addColorStop(0,`rgba(255,239,138,${a})`);g.addColorStop(.18,`rgba(209,235,120,${a*.65})`);g.addColorStop(1,'rgba(110,180,90,0)');x.fillStyle=g;x.beginPath();x.arc(px,py,r,0,7);x.fill();}
+function draw(){
+ x.fillStyle='#070a0c';x.fillRect(0,0,W,H);
+ for(let i=0;i<22;i++){const px=(i*83.17%W),py=(i*147.31%H),a=.05+.03*Math.sin(t*.7+i);x.fillStyle=`rgba(180,210,190,${a})`;x.fillRect(px,py,1,1)}
+ for(const q of touches){glow(q.x,q.y,90*q.life*q.power,.14*q.life);x.fillStyle=`rgba(255,244,180,${.24*q.life})`;x.beginPath();x.arc(q.x,q.y,2+3*(1-q.life),0,7);x.fill()}
+ const speed=Math.hypot(bug.vx,bug.vy);const pulse=.72+.28*Math.sin(t*3.2);glow(bug.x,bug.y,25+6*pulse,.16+.08*pulse);
+ x.save();x.translate(Math.round(bug.x),Math.round(bug.y));
+ const ang=Math.atan2(bug.vy,bug.vx);x.rotate(ang);
+ const wing=Math.sin(bug.phase)*2.4;
+ x.fillStyle='rgba(174,205,187,.22)';x.fillRect(-2,-5-wing*.18,5,2);x.fillRect(-2,3+wing*.18,5,2);
+ x.fillStyle='#1b2422';x.fillRect(-4,-2,6,5);x.fillStyle='#29332f';x.fillRect(1,-1,3,3);
+ x.fillStyle=`rgba(240,255,130,${.78+.2*pulse})`;x.fillRect(-5,-1,2,3);
+ x.fillStyle='#9aa79e';x.fillRect(4,0,1,1);
+ if(bug.startled>0){x.fillStyle='#d8e4dc';x.fillRect(4,-2,1,1)}
+ x.restore();
+ if(navigator.maxTouchPoints===0){x.fillStyle='rgba(255,255,255,.025)';x.fillText('tap',10,18)}
+}
+function loop(ms){const now=ms/1000,dt=Math.min(.033,now-last||.016);last=now;update(dt);draw();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
