@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>Pocket Worm</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#17130f;touch-action:none;overscroll-behavior:none;font-family:ui-monospace,Menlo,monospace}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+#hint{position:fixed;left:0;right:0;bottom:max(18px,env(safe-area-inset-bottom));text-align:center;color:#8d7b61;font-size:12px;letter-spacing:.08em;pointer-events:none;transition:opacity .8s}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas><div id="hint">tap the dirt</div>
+<script>
+(()=>{
+const c=document.getElementById('c'),x=c.getContext('2d'),hint=document.getElementById('hint');
+let W=0,H=0,D=1,t=0,last=performance.now(),tapCount=0;
+const holes=[]; const puffs=[];
+const worm={hole:2,phase:'peek',timer:0,y:0,targetY:0,look:1,blink:0,bonk:0};
+function resize(){D=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;c.width=W*D;c.height=H*D;x.setTransform(D,0,0,D,0,0);makeHoles()}
+function makeHoles(){holes.length=0; const n=5, span=Math.min(W-48,390), start=(W-span)/2; for(let i=0;i<n;i++)holes.push({x:start+span*(i/(n-1)),y:H*.68+Math.sin(i*1.7)*9})}
+function rect(px,py,w,h,col){x.fillStyle=col;x.fillRect(Math.round(px),Math.round(py),w,h)}
+function dirt(h){x.fillStyle='#2b2117';x.beginPath();x.ellipse(h.x,h.y+5,16,6,0,0,Math.PI*2);x.fill();rect(h.x-10,h.y+3,20,3,'#0d0b09')}
+function puff(px,py){for(let i=0;i<7;i++)puffs.push({x:px+(Math.random()-.5)*12,y:py,vx:(Math.random()-.5)*34,vy:-16-Math.random()*28,a:1,s:2+Math.random()*2})}
+function chooseHole(avoid){let options=holes.map((_,i)=>i).filter(i=>i!==avoid);return options[(Math.random()*options.length)|0]}
+function scare(){if(worm.phase==='hide'||worm.phase==='travel')return;worm.phase='hide';worm.timer=0;worm.bonk=1;puff(holes[worm.hole].x,holes[worm.hole].y); if(navigator.vibrate)navigator.vibrate(18)}
+function poke(px,py){tapCount++;hint.style.opacity='0';let best=0,bd=1e9;holes.forEach((h,i)=>{let d=Math.hypot(px-h.x,py-h.y);if(d<bd){bd=d;best=i}});if(best===worm.hole&&bd<34&&worm.phase!=='travel'){scare()}else if(bd<46){worm.phase='hide';worm.timer=-.12;worm.next=best;puff(holes[best].x,holes[best].y)}else{puff(px,py)}}
+c.addEventListener('pointerdown',e=>{e.preventDefault();poke(e.clientX,e.clientY)},{passive:false});
+function update(dt){t+=dt;worm.timer+=dt;worm.blink=Math.max(0,worm.blink-dt);worm.bonk=Math.max(0,worm.bonk-dt*3);
+ if(worm.phase==='peek'&&worm.timer>1.5+Math.random()*1.2){worm.phase='rise';worm.timer=0}
+ else if(worm.phase==='rise'&&worm.timer>.42){worm.phase='watch';worm.timer=0}
+ else if(worm.phase==='watch'){if(worm.timer>1.1&&Math.random()<dt*.55)worm.look*=-1;if(Math.random()<dt*.16)worm.blink=.11;if(worm.timer>3.2+Math.random()*2.5){worm.phase='hide';worm.timer=0}}
+ else if(worm.phase==='hide'&&worm.timer>.35){let old=worm.hole;worm.hole=(worm.next!==undefined?worm.next:chooseHole(old));worm.next=undefined;worm.phase='travel';worm.timer=0}
+ else if(worm.phase==='travel'&&worm.timer>.45){puff(holes[worm.hole].x,holes[worm.hole].y);worm.phase='peek';worm.timer=0}
+}
+function drawWorm(){let h=holes[worm.hole],rise=0;if(worm.phase==='peek')rise=4;if(worm.phase==='rise')rise=4+Math.min(1,worm.timer/.42)*21;if(worm.phase==='watch')rise=25;if(worm.phase==='hide')rise=Math.max(0,25*(1-worm.timer/.35));if(worm.phase==='travel')rise=0;if(rise<=0)return;
+ const px=Math.round(h.x), base=Math.round(h.y+2), yy=base-rise; const wig=Math.round(Math.sin(t*5)*1.2);
+ rect(px-3,yy+10,7,Math.max(3,rise-8),'#c36b4a');rect(px-4,yy+4,9,8,'#d97b58');rect(px-3,yy+2,7,3,'#e08a65');
+ if(worm.bonk>0)rect(px-5,yy+1,11,2,'#f0a17a');
+ if(worm.blink<=0){rect(px-2+worm.look,yy+5,2,2,'#17130f');rect(px+2+worm.look,yy+5,2,2,'#17130f')}else{rect(px-2,yy+6,2,1,'#17130f');rect(px+2,yy+6,2,1,'#17130f')}
+ rect(px-1+wig,yy+9,3,1,'#7f3e31')
+}
+function draw(){x.clearRect(0,0,W,H);x.fillStyle='#17130f';x.fillRect(0,0,W,H);
+ // soft ground band
+ x.fillStyle='#201912';x.fillRect(0,H*.61,W,H*.39);
+ for(let i=0;i<90;i++){let gx=(i*73%997)/997*W,gy=H*.62+((i*47)%211)/211*H*.34;rect(gx,gy,1+(i%3===0),1,i%4?'#33271b':'#483522')}
+ holes.forEach(dirt);
+ drawWorm();
+ for(let i=puffs.length-1;i>=0;i--){let p=puffs[i];p.x+=p.vx/60;p.y+=p.vy/60;p.vy+=42/60;p.a-=.025;if(p.a<=0){puffs.splice(i,1);continue}x.globalAlpha=p.a;rect(p.x,p.y,p.s,p.s,'#705238');x.globalAlpha=1}
+ // tiny title, barely there
+ x.fillStyle='#584632';x.font='10px ui-monospace,monospace';x.textAlign='center';x.fillText('POCKET WORM',W/2,30);
+}
+function loop(now){let dt=Math.min(.033,(now-last)/1000);last=now;update(dt);draw();requestAnimationFrame(loop)}
+addEventListener('resize',resize);resize();requestAnimationFrame(loop);
+})();
+</script>
+</body></html>
