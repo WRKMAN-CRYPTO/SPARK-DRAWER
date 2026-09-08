@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<title>Pocket Dustbunny</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; width:100%; height:100%; overflow:hidden; background:#11120f; touch-action:none; }
+  canvas { width:100%; height:100%; display:block; image-rendering:pixelated; }
+  .label {
+    position:fixed; left:50%; top:max(16px,env(safe-area-inset-top)); transform:translateX(-50%);
+    font:600 11px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.16em;
+    color:#75796f; pointer-events:none; user-select:none; white-space:nowrap;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="label">POCKET DUSTBUNNY</div>
+<script>
+(() => {
+  const c = document.getElementById('c');
+  const x = c.getContext('2d');
+  let W=0,H=0,dpr=1,last=performance.now();
+  let touch=null;
+  const dust=[];
+  const bunny={x:0,y:0,vx:0,vy:0,face:1,blink:0,chew:0,panic:0,nap:0};
+
+  function resize(){
+    dpr=Math.min(2,devicePixelRatio||1);
+    W=innerWidth; H=innerHeight;
+    c.width=Math.floor(W*dpr); c.height=Math.floor(H*dpr);
+    x.setTransform(dpr,0,0,dpr,0,0);
+    if(!bunny.x){ bunny.x=W*.5; bunny.y=H*.68; }
+  }
+  addEventListener('resize',resize); resize();
+
+  function sprinkle(n=1, px=Math.random()*W, py=Math.random()*H){
+    for(let i=0;i<n;i++) dust.push({
+      x:px+(Math.random()-.5)*50, y:py+(Math.random()-.5)*50,
+      s:Math.random()<.2?2:1, life:1, drift:(Math.random()-.5)*.06
+    });
+    if(dust.length>90) dust.splice(0,dust.length-90);
+  }
+  sprinkle(26,W*.5,H*.52);
+
+  function pos(e){
+    const p=e.touches?e.touches[0]:e;
+    return {x:p.clientX,y:p.clientY};
+  }
+  function down(e){
+    e.preventDefault(); touch=pos(e);
+    bunny.nap=0;
+    sprinkle(3,touch.x,touch.y);
+  }
+  function move(e){ if(!touch)return; e.preventDefault(); touch=pos(e); }
+  function up(e){
+    if(!touch)return;
+    e.preventDefault();
+    sprinkle(5,touch.x,touch.y);
+    touch=null;
+  }
+  c.addEventListener('pointerdown',down,{passive:false});
+  c.addEventListener('pointermove',move,{passive:false});
+  c.addEventListener('pointerup',up,{passive:false});
+  c.addEventListener('pointercancel',up,{passive:false});
+
+  function update(dt){
+    bunny.blink-=dt; bunny.chew-=dt; bunny.panic-=dt;
+    if(Math.random()<dt*.00035 && bunny.blink<=0) bunny.blink=90;
+
+    // One rule: it hates being directly touched, but loves the mess your finger leaves behind.
+    if(touch){
+      const dx=bunny.x-touch.x, dy=bunny.y-touch.y, d=Math.hypot(dx,dy)||1;
+      if(d<92){
+        const f=(92-d)/92;
+        bunny.vx += dx/d*f*.11*dt;
+        bunny.vy += dy/d*f*.11*dt;
+        bunny.panic=140;
+      }
+    } else {
+      let target=null, best=1e9;
+      for(const p of dust){
+        const dd=(p.x-bunny.x)**2+(p.y-bunny.y)**2;
+        if(dd<best){best=dd;target=p;}
+      }
+      if(target && best<260*260){
+        const dx=target.x-bunny.x, dy=target.y-bunny.y, d=Math.hypot(dx,dy)||1;
+        bunny.vx += dx/d*.010*dt;
+        bunny.vy += dy/d*.010*dt;
+        if(d<8){
+          dust.splice(dust.indexOf(target),1);
+          bunny.chew=210;
+          bunny.vx*=.35; bunny.vy*=.35;
+        }
+      } else bunny.nap+=dt;
+    }
+
+    bunny.vx*=Math.pow(.986,dt/16.7); bunny.vy*=Math.pow(.986,dt/16.7);
+    const sp=Math.hypot(bunny.vx,bunny.vy), max=bunny.panic>0?.42:.19;
+    if(sp>max){ bunny.vx=bunny.vx/sp*max; bunny.vy=bunny.vy/sp*max; }
+    bunny.x+=bunny.vx*dt; bunny.y+=bunny.vy*dt;
+    if(Math.abs(bunny.vx)>.02) bunny.face=bunny.vx<0?-1:1;
+    const m=12;
+    if(bunny.x<m){bunny.x=m;bunny.vx=Math.abs(bunny.vx)}
+    if(bunny.x>W-m){bunny.x=W-m;bunny.vx=-Math.abs(bunny.vx)}
+    if(bunny.y<m){bunny.y=m;bunny.vy=Math.abs(bunny.vy)}
+    if(bunny.y>H-m){bunny.y=H-m;bunny.vy=-Math.abs(bunny.vy)}
+
+    for(const p of dust){ p.y+=p.drift*dt; p.x+=Math.sin((performance.now()+p.y)*.003)*.004*dt; }
+  }
+
+  function rect(px,py,w,h,col){ x.fillStyle=col; x.fillRect(Math.round(px),Math.round(py),w,h); }
+  function drawBunny(){
+    const bx=Math.round(bunny.x), by=Math.round(bunny.y);
+    const bob = bunny.chew>0 ? (Math.sin(performance.now()*.09)>0?1:0) : 0;
+    const c1=bunny.panic>0?'#c9c7b8':'#a5a798';
+    const c2=bunny.panic>0?'#ece8d5':'#d1d0bf';
+    // 10-ish pixels of alleged life.
+    rect(bx-3,by-2+bob,7,5,c1);
+    rect(bx-5,by-1+bob,2,3,c1);
+    rect(bx+4,by-1+bob,2,3,c1);
+    rect(bx-2,by-4+bob,2,2,c2);
+    rect(bx+1,by-5+bob,2,3,c2);
+    if(bunny.blink<=0){
+      const ex=bx+(bunny.face>0?2:-1);
+      rect(ex,by-2+bob,1,1,'#20211d');
+    }
+    if(bunny.chew>0 && Math.sin(performance.now()*.06)>0) rect(bx+(bunny.face>0?4:-4),by+1+bob,1,1,'#ece8d5');
+    if(bunny.nap>3500){
+      rect(bx+6,by-8,1,1,'#686b62');
+      if(bunny.nap>4700) rect(bx+9,by-11,2,1,'#686b62');
+    }
+  }
+
+  function draw(){
+    x.clearRect(0,0,W,H);
+    // faint floor grain
+    x.fillStyle='#11120f'; x.fillRect(0,0,W,H);
+    for(let i=0;i<28;i++){
+      const gx=(i*97%W), gy=(i*173%H);
+      rect(gx,gy,1,1,'#1b1d18');
+    }
+    for(const p of dust) rect(p.x,p.y,p.s,p.s,p.s===2?'#6e7067':'#50534b');
+    if(touch){
+      x.beginPath(); x.arc(touch.x,touch.y,28,0,Math.PI*2);
+      x.strokeStyle='#2b2e27'; x.lineWidth=1; x.stroke();
+    }
+    drawBunny();
+  }
+
+  function loop(t){
+    const dt=Math.min(34,t-last); last=t;
+    update(dt); draw(); requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
