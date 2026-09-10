@@ -21,11 +21,14 @@ function update(dt){m.wing+=dt*38;m.t-=dt;if(finger){finger.t-=dt;if(finger.t<=0
  let pad=30;if(m.x<pad){m.x=pad;m.vx=Math.abs(m.vx)}if(m.x>W-pad){m.x=W-pad;m.vx=-Math.abs(m.vx)}if(m.y<pad){m.y=pad;m.vy=Math.abs(m.vy)}if(m.y>H-pad){m.y=H-pad;m.vy=-Math.abs(m.vy)} }
 function line(a,b,c1,d,w=1){x.lineWidth=w;x.beginPath();x.moveTo(a,b);x.lineTo(c1,d);x.stroke()}
 function drawMosquito(){x.save();x.translate(Math.round(m.x),Math.round(m.y));let ang=Math.atan2(m.vy,m.vx);if(Math.hypot(m.vx,m.vy)>18)x.rotate(ang);x.strokeStyle='#232822';x.fillStyle='#232822';
- // absurdly thin legs, body, and unmistakable proboscis
  line(-2,2,-13,13);line(1,2,12,14);line(-1,4,-7,17);line(3,3,18,9);line(-3,0,-17,-7);line(2,0,15,-8);
  x.fillRect(-5,-2,8,4);x.fillRect(3,-1,5,3);x.fillRect(-9,-1,4,3);line(8,0,20,1,1);
- // wings flicker between two silhouettes instead of rotating the whole sprite
- x.globalAlpha=.38;let s=Math.sin(m.wing)>0?1:-1;x.fillRect(-2,-8,7,3);x.fillRect(-2,5,7,3);if(s>0){x.fillRect(1,-11,5,2);x.fillRect(1,8,5,2)}x.restore()}
+ // larger, long narrow wings: enough lift for that ridiculous body without losing the pixel insect silhouette
+ x.globalAlpha=.34;let s=Math.sin(m.wing)>0?1:-1;
+ x.fillRect(-3,-10,11,4);x.fillRect(-3,6,11,4);
+ x.fillRect(1,-13,9,3);x.fillRect(1,10,9,3);
+ if(s>0){x.fillRect(5,-15,6,2);x.fillRect(5,13,6,2)}else{x.fillRect(-1,-12,8,2);x.fillRect(-1,10,8,2)}
+ x.restore()}
 function draw(){x.clearRect(0,0,W,H);x.fillStyle='#cbd5c0';for(let i=0;i<18;i++){let px=(i*83)%W,py=(i*137)%H;x.fillRect(px,py,1,1)}if(finger){x.strokeStyle=`rgba(80,90,72,${finger.t})`;x.beginPath();x.arc(finger.x,finger.y,20+(1-finger.t)*20,0,Math.PI*2);x.stroke()}drawMosquito()}
 let last=performance.now();function loop(now){let dt=Math.min((now-last)/1000,.033);last=now;update(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
 </script></body></html>
