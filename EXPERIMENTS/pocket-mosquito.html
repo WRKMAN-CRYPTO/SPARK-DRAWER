@@ -1,34 +1,10 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<title>Pocket Mosquito</title>
-<style>
-html,body{margin:0;height:100%;overflow:hidden;background:#d9e0cf;touch-action:none;font-family:ui-monospace,monospace}canvas{width:100%;height:100%;display:block;image-rendering:pixelated}.note{position:fixed;left:0;right:0;bottom:max(14px,env(safe-area-inset-bottom));text-align:center;font-size:12px;letter-spacing:.08em;color:#56604f;pointer-events:none}
-</style></head><body><canvas id="c"></canvas><div class="note">tap near it</div>
-<script>
-const c=document.querySelector('#c'),x=c.getContext('2d');let W,H,dpr;
-function size(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;x.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',size);size();
-const m={x:W*.53,y:H*.45,vx:0,vy:0,a:0,state:'hover',t:0,wing:0,land:0};
-let finger=null;
-function choose(){let ang=Math.random()*Math.PI*2,dist=55+Math.random()*120;m.vx=Math.cos(ang)*dist;m.vy=Math.sin(ang)*dist;m.t=.12+Math.random()*.2;m.state='dart'}
-function tap(px,py){finger={x:px,y:py,t:.35};let dx=m.x-px,dy=m.y-py;if(dx*dx+dy*dy<150*150){let a=Math.atan2(dy,dx)+(Math.random()-.5)*1.2;m.vx=Math.cos(a)*(420+Math.random()*220);m.vy=Math.sin(a)*(420+Math.random()*220);m.t=.07+Math.random()*.08;m.state='panic'}}
-c.addEventListener('pointerdown',e=>tap(e.clientX,e.clientY));
-function update(dt){m.wing+=dt*38;m.t-=dt;if(finger){finger.t-=dt;if(finger.t<=0)finger=null}
- if(m.state==='hover'){m.a+=dt*(2+Math.random());m.vx+=Math.cos(m.a*2.7)*18*dt;m.vy+=Math.sin(m.a*3.1)*18*dt;m.vx*=.975;m.vy*=.975;if(m.t<0){m.t=.25+Math.random()*.65;if(Math.random()<.55)choose()}}
- else {m.vx*=Math.pow(.12,dt);m.vy*=Math.pow(.12,dt);if(m.t<0){m.state='hover';m.t=.15+Math.random()*.5}}
- m.x+=m.vx*dt;m.y+=m.vy*dt;
- let pad=30;if(m.x<pad){m.x=pad;m.vx=Math.abs(m.vx)}if(m.x>W-pad){m.x=W-pad;m.vx=-Math.abs(m.vx)}if(m.y<pad){m.y=pad;m.vy=Math.abs(m.vy)}if(m.y>H-pad){m.y=H-pad;m.vy=-Math.abs(m.vy)} }
-function line(a,b,c1,d,w=1){x.lineWidth=w;x.beginPath();x.moveTo(a,b);x.lineTo(c1,d);x.stroke()}
-function drawMosquito(){x.save();x.translate(Math.round(m.x),Math.round(m.y));let ang=Math.atan2(m.vy,m.vx);if(Math.hypot(m.vx,m.vy)>18)x.rotate(ang);x.strokeStyle='#232822';x.fillStyle='#232822';
- line(-2,2,-13,13);line(1,2,12,14);line(-1,4,-7,17);line(3,3,18,9);line(-3,0,-17,-7);line(2,0,15,-8);
- x.fillRect(-5,-2,8,4);x.fillRect(3,-1,5,3);x.fillRect(-9,-1,4,3);line(8,0,20,1,1);
- // larger, long narrow wings: enough lift for that ridiculous body without losing the pixel insect silhouette
- x.globalAlpha=.34;let s=Math.sin(m.wing)>0?1:-1;
- x.fillRect(-3,-10,11,4);x.fillRect(-3,6,11,4);
- x.fillRect(1,-13,9,3);x.fillRect(1,10,9,3);
- if(s>0){x.fillRect(5,-15,6,2);x.fillRect(5,13,6,2)}else{x.fillRect(-1,-12,8,2);x.fillRect(-1,10,8,2)}
- x.restore()}
-function draw(){x.clearRect(0,0,W,H);x.fillStyle='#cbd5c0';for(let i=0;i<18;i++){let px=(i*83)%W,py=(i*137)%H;x.fillRect(px,py,1,1)}if(finger){x.strokeStyle=`rgba(80,90,72,${finger.t})`;x.beginPath();x.arc(finger.x,finger.y,20+(1-finger.t)*20,0,Math.PI*2);x.stroke()}drawMosquito()}
-let last=performance.now();function loop(now){let dt=Math.min((now-last)/1000,.033);last=now;update(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><title>Pocket Mosquito</title><style>html,body{margin:0;height:100%;overflow:hidden;background:#d9e0cf;touch-action:none;font-family:ui-monospace,monospace}canvas{width:100%;height:100%;display:block;image-rendering:pixelated}.note{position:fixed;left:0;right:0;bottom:max(14px,env(safe-area-inset-bottom));text-align:center;font-size:12px;letter-spacing:.08em;color:#56604f;pointer-events:none}</style></head><body><canvas id="c"></canvas><div class="note">tap near it</div><script>
+const c=document.querySelector('#c'),x=c.getContext('2d');let W,H,dpr;function size(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;x.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',size);size();const m={x:W*.53,y:H*.45,vx:0,vy:0,a:0,state:'hover',t:0,wing:0};let finger=null;
+function choose(){let a=Math.random()*Math.PI*2,d=55+Math.random()*120;m.vx=Math.cos(a)*d;m.vy=Math.sin(a)*d;m.t=.12+Math.random()*.2;m.state='dart'}function tap(px,py){finger={x:px,y:py,t:.35};let dx=m.x-px,dy=m.y-py;if(dx*dx+dy*dy<22500){let a=Math.atan2(dy,dx)+(Math.random()-.5)*1.2;m.vx=Math.cos(a)*(420+Math.random()*220);m.vy=Math.sin(a)*(420+Math.random()*220);m.t=.07+Math.random()*.08;m.state='panic'}}c.addEventListener('pointerdown',e=>tap(e.clientX,e.clientY));
+function update(dt){m.wing+=dt*38;m.t-=dt;if(finger&&((finger.t-=dt)<=0))finger=null;if(m.state==='hover'){m.a+=dt*(2+Math.random());m.vx+=Math.cos(m.a*2.7)*18*dt;m.vy+=Math.sin(m.a*3.1)*18*dt;m.vx*=.975;m.vy*=.975;if(m.t<0){m.t=.25+Math.random()*.65;if(Math.random()<.55)choose()}}else{m.vx*=Math.pow(.12,dt);m.vy*=Math.pow(.12,dt);if(m.t<0){m.state='hover';m.t=.15+Math.random()*.5}}m.x+=m.vx*dt;m.y+=m.vy*dt;let p=30;if(m.x<p){m.x=p;m.vx=Math.abs(m.vx)}if(m.x>W-p){m.x=W-p;m.vx=-Math.abs(m.vx)}if(m.y<p){m.y=p;m.vy=Math.abs(m.vy)}if(m.y>H-p){m.y=H-p;m.vy=-Math.abs(m.vy)}}function line(a,b,c1,d,w=1){x.lineWidth=w;x.beginPath();x.moveTo(a,b);x.lineTo(c1,d);x.stroke()}
+function drawMosquito(){x.save();x.translate(Math.round(m.x),Math.round(m.y));let a=Math.atan2(m.vy,m.vx);if(Math.hypot(m.vx,m.vy)>18)x.rotate(a);x.strokeStyle='#232822';x.fillStyle='#232822';line(-2,2,-13,13);line(1,2,12,14);line(-1,4,-7,17);line(3,3,18,9);line(-3,0,-17,-7);line(2,0,15,-8);x.fillRect(-5,-2,8,4);x.fillRect(3,-1,5,3);x.fillRect(-9,-1,4,3);line(8,0,20,1,1);
+// One wing silhouette, mirrored exactly across the body axis.
+x.globalAlpha=.34;const flap=Math.sin(m.wing)>0?2:0;function wing(side){x.save();x.scale(1,side);x.fillRect(-3,-10-flap,11,4);x.fillRect(1,-13-flap,9,3);x.fillRect(5,-15-flap,6,2);x.restore()}wing(1);wing(-1);x.restore()}
+function draw(){x.clearRect(0,0,W,H);x.fillStyle='#cbd5c0';for(let i=0;i<18;i++)x.fillRect((i*83)%W,(i*137)%H,1,1);if(finger){x.strokeStyle=`rgba(80,90,72,${finger.t})`;x.beginPath();x.arc(finger.x,finger.y,20+(1-finger.t)*20,0,Math.PI*2);x.stroke()}drawMosquito()}let last=performance.now();function loop(n){let dt=Math.min((n-last)/1000,.033);last=n;update(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
 </script></body></html>
