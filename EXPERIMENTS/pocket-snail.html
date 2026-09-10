@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><title>Pocket Snail</title><style>*{box-sizing:border-box;touch-action:none}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#171b22;color:#d9e0e8;font-family:system-ui,sans-serif}canvas{display:block;width:100%;height:100%}.note{position:fixed;left:0;right:0;bottom:max(14px,env(safe-area-inset-bottom));text-align:center;font-size:12px;opacity:.35;pointer-events:none}</style></head><body><canvas id="c"></canvas><div class="note">tap somewhere interesting</div><script>
+const c=document.querySelector('#c'),x=c.getContext('2d');let W,H,dpr,tx,ty,tap=0;
+function size(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;x.setTransform(dpr,0,0,dpr,0,0);if(tx==null){tx=W*.72;ty=H*.62}}size();addEventListener('resize',size);
+let s={x:W*.28,y:H*.62,vx:0,face:1,blink:0,feel:0,trail:[]};
+function point(e){let p=e.touches?e.touches[0]:e;tx=p.clientX;ty=p.clientY;tap=1;s.feel=1}addEventListener('pointerdown',point);
+function rect(a,b,w,h,col){x.fillStyle=col;x.fillRect(Math.round(a),Math.round(b),w,h)}
+function drawSnail(){let X=Math.round(s.x),Y=Math.round(s.y),f=s.face;
+ // shadow
+ rect(X-14,Y+8,31,3,'#0b0d11');
+ // slime history
+ x.globalAlpha=.18;for(let p of s.trail)rect(p.x,p.y+7,3,1,'#9fe5ca');x.globalAlpha=1;
+ // foot/body, deliberately tiny
+ rect(X-9,Y+3,22,5,'#9fc7a2');rect(X+8*f,Y-2,6,7,'#b7d8af');
+ // shell
+ rect(X-8,Y-8,13,13,'#c98e67');rect(X-5,Y-5,7,7,'#8d5f55');rect(X-3,Y-3,3,3,'#d7a173');
+ // antennae
+ rect(X+11*f,Y-8,2,7,'#b7d8af');rect(X+6*f,Y-7,2,6,'#b7d8af');
+ rect(X+11*f,Y-9,2,2,'#d9e0e8');rect(X+6*f,Y-8,2,2,'#d9e0e8');
+ // one suspicious eyebrow when destination is behind him
+ if((tx-s.x)*f<0)rect(X+7*f,Y-12,5*f,1,'#d9e0e8');
+}
+function frame(t){x.clearRect(0,0,W,H);let dx=tx-s.x,dy=ty-s.y,dist=Math.hypot(dx,dy);if(Math.abs(dx)>5)s.face=dx>0?1:-1;
+ // snail considers every request before obeying
+ if(tap){tap=0;setTimeout(()=>s.feel=0,650)}
+ let willing=dist>12 && s.feel<.5;if(willing){let speed=Math.min(.28,dist/1200);s.x+=dx/dist*speed;s.y+=dy/dist*speed;s.trail.push({x:s.x-s.face*10,y:s.y});if(s.trail.length>55)s.trail.shift()}
+ // target crumb only exists after you tap
+ if(tx!=null){x.globalAlpha=.65;rect(tx-2,ty-2,4,4,'#e9c46a');x.globalAlpha=1}
+ drawSnail();requestAnimationFrame(frame)}requestAnimationFrame(frame);
+</script></body></html>
