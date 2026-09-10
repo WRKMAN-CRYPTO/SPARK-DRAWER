@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Pocket Tick</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#ddd8c8;touch-action:none}canvas{width:100%;height:100%;display:block;image-rendering:pixelated}#hint{position:fixed;left:0;right:0;bottom:18px;text-align:center;font:12px monospace;color:#6d695e;pointer-events:none;opacity:.75}
+</style></head><body><canvas id="c"></canvas><div id="hint">tap near him</div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');let W,H,d=4;
+function size(){W=Math.ceil(innerWidth/d);H=Math.ceil(innerHeight/d);c.width=W;c.height=H}addEventListener('resize',size);size();
+let bug={x:W*.5,y:H*.5,a:0,v:0,state:'idle',t:50,leg:0};
+function rnd(a,b){return a+Math.random()*(b-a)}
+function poke(px,py){let dx=bug.x-px/d,dy=bug.y-py/d,dist=Math.hypot(dx,dy);if(dist<35){bug.a=Math.atan2(dy,dx)+rnd(-.35,.35);bug.v=rnd(.8,1.35);bug.state='run';bug.t=rnd(18,38)}}
+addEventListener('pointerdown',e=>poke(e.clientX,e.clientY));
+function update(){bug.t--;if(bug.state==='idle'){if(bug.t<=0){bug.state=Math.random()<.72?'walk':'scratch';bug.t=rnd(20,60);bug.a+=rnd(-1,1)}}else if(bug.state==='walk'){bug.v=.18;if(bug.t<=0){bug.state='idle';bug.t=rnd(35,110)}}else if(bug.state==='run'){bug.v*=.94;if(bug.t<=0||bug.v<.2){bug.state='freeze';bug.t=rnd(20,55)}}else if(bug.state==='freeze'){bug.v=0;if(bug.t<=0){bug.state='idle';bug.t=rnd(25,80)}}else if(bug.state==='scratch'){bug.v=0;if(bug.t<=0){bug.state='idle';bug.t=rnd(30,90)}}
+if(bug.v){bug.x+=Math.cos(bug.a)*bug.v;bug.y+=Math.sin(bug.a)*bug.v;bug.leg+=bug.v*1.7}if(bug.x<6||bug.x>W-6){bug.a=Math.PI-bug.a;bug.x=Math.max(6,Math.min(W-6,bug.x))}if(bug.y<6||bug.y>H-6){bug.a=-bug.a;bug.y=Math.max(6,Math.min(H-6,bug.y))}}
+function p(px,py){x.fillRect(Math.round(px),Math.round(py),1,1)}
+function drawBug(){x.save();x.translate(Math.round(bug.x),Math.round(bug.y));x.rotate(bug.a);x.fillStyle='#302b24';
+// squat little seed-shaped body
+x.fillRect(-3,-2,5,5);x.fillRect(2,-1,2,3);p(4,-1);p(4,1);
+// legs deliberately read as nervous little hooks
+let q=bug.state==='scratch'?Math.floor(performance.now()/90)%2:Math.floor(bug.leg)%2;for(let i=-1;i<=1;i++){let xx=i*2; p(xx,-3);p(xx+(q?1:-1),-4);p(xx,3);p(xx+(q?-1:1),4)}
+// tiny feelers
+p(5,-2);p(5,2);if(bug.state==='freeze'){p(-4,0)}
+x.restore()}
+function frame(){update();x.fillStyle='#ddd8c8';x.fillRect(0,0,W,H);x.fillStyle='#c4beac';for(let i=0;i<16;i++){let xx=(i*37)%W,yy=(i*61)%H;p(xx,yy)}drawBug();requestAnimationFrame(frame)}frame();
+</script></body></html>
