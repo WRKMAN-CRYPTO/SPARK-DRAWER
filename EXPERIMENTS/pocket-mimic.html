@@ -1,0 +1,12 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><title>Pocket Mimic</title><style>*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#eee8d8;touch-action:none;font-family:ui-monospace,monospace}canvas{width:100%;height:100%;display:block;image-rendering:pixelated}.note{position:fixed;left:0;right:0;bottom:max(18px,env(safe-area-inset-bottom));text-align:center;font-size:12px;opacity:.42;pointer-events:none}</style></head><body><canvas id="c"></canvas><div class="note">it saw you do that.</div><script>
+const c=document.getElementById('c'),x=c.getContext('2d');let w,h,d=devicePixelRatio||1;function rs(){w=innerWidth;h=innerHeight;c.width=w*d;c.height=h*d;x.setTransform(d,0,0,d,0,0)}addEventListener('resize',rs);rs();
+let me={x:w*.5,y:h*.55,vx:0,vy:0,face:1}, trail=[], mimic=[], replay=false, wait=0, blink=0, mood=0;
+function pt(e){return{x:e.clientX,y:e.clientY,t:performance.now()}}
+addEventListener('pointerdown',e=>{trail=[pt(e)];replay=false;wait=0;mood=0});addEventListener('pointermove',e=>{if(e.buttons)trail.push(pt(e))});addEventListener('pointerup',e=>{trail.push(pt(e));if(trail.length>2){let a=trail[0], sx=me.x-a.x,sy=me.y-a.y;mimic=trail.map(p=>({x:p.x+sx,y:p.y+sy,t:p.t-a.t}));wait=28+Math.random()*35;mood=1}});
+function drawGuy(){x.save();x.translate(Math.round(me.x),Math.round(me.y));if(me.face<0)x.scale(-1,1);x.fillStyle='#24231f';x.fillRect(-7,-5,14,10);x.fillRect(-9,-3,2,7);x.fillRect(7,-3,2,7);x.fillRect(-5,5,3,5);x.fillRect(3,5,3,5);x.fillStyle='#eee8d8';x.fillRect(2,-2,2,2);if(blink>0)x.fillStyle='#24231f',x.fillRect(2,-2,2,2);if(mood){x.fillStyle='#24231f';x.fillRect(-3,-8,6,2)}x.restore()}
+let last=performance.now(),ri=0,rt=0;function loop(now){let dt=Math.min(32,now-last);last=now;x.clearRect(0,0,w,h);x.fillStyle='#d8d0bd';x.fillRect(0,h*.72,w,2);
+if(wait>0){wait-=dt/16.7;if(wait<=0&&mimic.length){replay=true;ri=0;rt=now;mood=0}}
+if(replay){let elapsed=now-rt;while(ri<mimic.length-1&&mimic[ri+1].t<=elapsed)ri++;let p=mimic[ri];if(p){me.face=p.x>=me.x?1:-1;me.x+=(p.x-me.x)*.38;me.y+=(p.y-me.y)*.38}if(ri>=mimic.length-1&&elapsed>mimic.at(-1).t+180){replay=false;mimic=[];setTimeout(()=>mood=2,120)}}else if(!trail.length){me.y+=Math.sin(now/420)*.03}
+if(Math.random()<.003)blink=5;if(blink>0)blink--;drawGuy();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+</script></body></html>
