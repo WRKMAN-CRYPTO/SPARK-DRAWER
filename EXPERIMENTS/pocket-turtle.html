@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Pocket Turtle</title><style>*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#d8c99b;touch-action:none}canvas{width:100%;height:100%;display:block;image-rendering:pixelated}.tag{position:fixed;left:12px;top:10px;font:700 11px ui-monospace,monospace;letter-spacing:2px;color:#4d5537;opacity:.55;pointer-events:none}</style></head><body><div class="tag">POCKET TURTLE</div><canvas id="c"></canvas><script>
+const c=document.querySelector('#c'),x=c.getContext('2d');let W,H,d=devicePixelRatio||1;
+function resize(){W=innerWidth;H=innerHeight;c.width=W*d;c.height=H*d;x.setTransform(d,0,0,d,0,0);x.imageSmoothingEnabled=false}addEventListener('resize',resize);resize();
+const t={x:W*.5,y:H*.55,a:0,tx:W*.5,ty:H*.55,step:0,panic:0,hide:0};
+function point(e){const p=e.touches?e.touches[0]:e;t.tx=p.clientX;t.ty=p.clientY;const dx=t.tx-t.x,dy=t.ty-t.y;if(Math.hypot(dx,dy)<70){t.panic=1;t.tx=t.x-dx*4;t.ty=t.y-dy*4}else t.panic=0}
+addEventListener('pointerdown',point);addEventListener('pointermove',e=>{if(e.buttons)point(e)});addEventListener('touchstart',point,{passive:true});
+function rect(px,py,w,h,col){x.fillStyle=col;x.fillRect(Math.round(px),Math.round(py),w,h)}
+function turtle(){x.save();x.translate(Math.round(t.x),Math.round(t.y));x.rotate(t.a);const s=4, bob=Math.sin(t.step)*1.5; // rear legs
+rect(-13*s,-7*s+bob,5*s,4*s,'#59653b');rect(-13*s,3*s-bob,5*s,4*s,'#59653b');
+// front legs, alternating deliberate shove
+rect(8*s,-8*s-bob,5*s,4*s,'#657244');rect(8*s,4*s+bob,5*s,4*s,'#657244');
+// tail
+rect(-14*s,-1*s,4*s,2*s,'#59653b');
+// head peeks farther when calm
+const head=t.panic?8:13;rect(8*s,-4*s,head*s,8*s,'#71804a');rect((8+head)*s,-2*s,2*s,2*s,'#202719');
+// shell pixel oval
+rect(-10*s,-8*s,19*s,16*s,'#465032');rect(-7*s,-10*s,13*s,20*s,'#465032');rect(-7*s,-7*s,13*s,14*s,'#76804c');rect(-4*s,-8*s,7*s,16*s,'#697342');rect(-6*s,-5*s,11*s,10*s,'#87905a');
+// scute marks
+rect(-1*s,-5*s,1*s,10*s,'#59633b');rect(-5*s,-1*s,10*s,1*s,'#59633b');x.restore()}
+let last=performance.now();function loop(now){let dt=Math.min(.035,(now-last)/1000);last=now;const dx=t.tx-t.x,dy=t.ty-t.y,dist=Math.hypot(dx,dy);if(dist>8){let target=Math.atan2(dy,dx),da=Math.atan2(Math.sin(target-t.a),Math.cos(target-t.a));t.a+=da*Math.min(1,dt*3.2);let speed=t.panic?72:26;t.x+=Math.cos(t.a)*speed*dt;t.y+=Math.sin(t.a)*speed*dt;t.step+=dt*(t.panic?11:4.2)}else t.step+=dt*.8;
+// turtle-sized boundaries
+t.x=Math.max(62,Math.min(W-62,t.x));t.y=Math.max(55,Math.min(H-55,t.y));x.clearRect(0,0,W,H);
+// tiny road-like warm ground speckles
+for(let i=0;i<18;i++){let q=(i*97)%W,r=(i*173)%H;rect(q,r,2,2,'rgba(80,85,50,.12)')}turtle();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+</script></body></html>
