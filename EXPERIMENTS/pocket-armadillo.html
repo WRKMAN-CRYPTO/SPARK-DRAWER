@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Pocket Armadillo</title><style>*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#171816;touch-action:none}canvas{width:100%;height:100%;display:block;image-rendering:pixelated}.tag{position:fixed;left:12px;top:10px;color:#777;font:11px ui-monospace,monospace;letter-spacing:.12em;pointer-events:none}</style></head><body><canvas id="c"></canvas><div class="tag">POCKET ARMADILLO</div><script>
+const c=document.getElementById('c'),x=c.getContext('2d');let W,H,d=1;
+function size(){d=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*d;c.height=H*d;x.setTransform(d,0,0,d,0,0)}addEventListener('resize',size);size();
+let a={x:W*.5,y:H*.62,vx:0,dir:1,state:'sniff',t:0,scare:0},finger=null;
+function rnd(n){return Math.random()*n}function resetState(){let r=Math.random();a.state=r<.48?'walk':r<.78?'sniff':'pause';a.t=45+rnd(100)}
+function poke(px,py){let dx=px-a.x,dy=py-a.y;if(dx*dx+dy*dy<110*110){a.state='curl';a.scare=90;a.t=0}else{a.dir=px<a.x?-1:1;a.state='walk';a.t=70}}
+addEventListener('pointerdown',e=>{finger={x:e.clientX,y:e.clientY};poke(finger.x,finger.y)});addEventListener('pointermove',e=>{if(finger)finger={x:e.clientX,y:e.clientY}});addEventListener('pointerup',()=>finger=null);
+function step(){if(a.state==='curl'){if(--a.scare<=0){a.state='peek';a.t=55}}else{if(--a.t<=0)resetState();if(a.state==='walk'){a.vx+=a.dir*.018;a.vx=Math.max(-.52,Math.min(.52,a.vx))}else a.vx*=.88;a.x+=a.vx;if(a.x<35){a.x=35;a.dir=1}if(a.x>W-35){a.x=W-35;a.dir=-1}}
+}
+function pix(px,py,w,h,col){x.fillStyle=col;x.fillRect(Math.round(px),Math.round(py),w,h)}
+function drawCritter(){x.save();x.translate(Math.round(a.x),Math.round(a.y));x.scale(a.dir,1);let bob=a.state==='walk'?Math.sin(performance.now()/95)*1.2:0;x.translate(0,bob);
+if(a.state==='curl'){x.fillStyle='#857966';x.beginPath();x.arc(0,1,17,0,Math.PI*2);x.fill();x.strokeStyle='#4e493f';x.lineWidth=2;for(let r=6;r<17;r+=5){x.beginPath();x.arc(0,1,r,-1.3,1.3);x.stroke()}pix(-5,-2,3,3,'#252724');x.restore();return}
+// tail
+pix(-27,4,11,4,'#716858');pix(-34,6,9,3,'#625b4e');
+// legs with low-frequency gait
+let gait=a.state==='walk'?Math.sin(performance.now()/180)*3:0;pix(-10,11+gait,4,8,'#5d574b');pix(8,11-gait,4,8,'#5d574b');pix(-11,18+gait,7,3,'#3f3d36');pix(7,18-gait,7,3,'#3f3d36');
+// armored body
+x.fillStyle='#8d806b';x.beginPath();x.ellipse(-2,2,21,14,0,0,Math.PI*2);x.fill();x.strokeStyle='#554f44';x.lineWidth=2;for(let q=-12;q<=10;q+=6){x.beginPath();x.moveTo(q,-9);x.quadraticCurveTo(q+3,2,q,13);x.stroke()}
+// head, low and nosy
+pix(15,-3,12,12,'#746b5c');pix(24,1,10,7,'#746b5c');pix(31,3,5,4,'#3b3a34');pix(20,-7,5,6,'#5f584d');pix(23,-2,2,2,'#171816');
+if(a.state==='sniff'||a.state==='peek'){let s=Math.sin(performance.now()/75)*2;pix(35,4+s,4,2,'#b2a28a')}
+x.restore()}
+function draw(){x.clearRect(0,0,W,H);x.fillStyle='#1d1f1b';x.fillRect(0,H*.68,W,H*.32);for(let i=0;i<10;i++)pix((i*97+31)%W,H*.68+18+(i%4)*21,2,2,'#303229');drawCritter();if(finger){x.strokeStyle='#393c34';x.beginPath();x.arc(finger.x,finger.y,8,0,7);x.stroke()}step();requestAnimationFrame(draw)}resetState();draw();
+</script></body></html>
