@@ -1,0 +1,28 @@
+<!doctype html>
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>argument with a dot</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#101114;color:#ddd;font-family:ui-monospace,monospace;touch-action:none}canvas{width:100%;height:100%;display:block}.note{position:fixed;left:12px;bottom:12px;font-size:12px;opacity:.45;pointer-events:none}
+</style>
+<canvas id="c"></canvas><div class="note">it disagrees about where you touched</div>
+<script>
+const c=document.querySelector('#c'),x=c.getContext('2d');let w,h,dpr;
+function size(){dpr=devicePixelRatio||1;w=innerWidth;h=innerHeight;c.width=w*dpr;c.height=h*dpr;x.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',size);size();
+let you={x:w/2,y:h/2}, dot={x:w/2,y:h/2}, claim={x:w/2,y:h/2}, t=0, active=false;
+function point(e){let p=e.touches?e.touches[0]:e;you.x=p.clientX;you.y=p.clientY;active=true;
+ // The dot accepts the event, but forms its own opinion about it.
+ let dx=you.x-w/2,dy=you.y-h/2,r=Math.hypot(dx,dy)||1;
+ let sideways=Math.sin(t*.013+r*.021)*Math.min(74,10+r*.08);
+ claim.x=you.x + (-dy/r)*sideways + Math.sin(t*.031)*9;
+ claim.y=you.y + ( dx/r)*sideways + Math.cos(t*.027)*9;
+}
+addEventListener('pointerdown',point);addEventListener('pointermove',e=>{if(e.buttons)point(e)});addEventListener('touchstart',point,{passive:true});addEventListener('touchmove',point,{passive:true});addEventListener('pointerup',()=>active=false);addEventListener('touchend',()=>active=false);
+function loop(){t++;dot.x+=(claim.x-dot.x)*.075;dot.y+=(claim.y-dot.y)*.075;x.clearRect(0,0,w,h);
+ // your testimony
+ if(active){x.strokeStyle='rgba(255,255,255,.18)';x.beginPath();x.arc(you.x,you.y,11,0,7);x.stroke();x.fillStyle='rgba(255,255,255,.35)';x.fillRect(you.x-1,you.y-1,2,2)}
+ // its testimony
+ x.strokeStyle='rgba(255,255,255,.07)';x.beginPath();x.moveTo(dot.x,dot.y);x.lineTo(you.x,you.y);x.stroke();
+ x.fillStyle='#e8e8e8';x.beginPath();x.arc(dot.x,dot.y,5,0,7);x.fill();
+ if(Math.hypot(dot.x-you.x,dot.y-you.y)<7&&active){x.font='11px ui-monospace,monospace';x.fillStyle='rgba(255,255,255,.35)';x.fillText('fine.',dot.x+10,dot.y-10)}
+ requestAnimationFrame(loop)}loop();
+</script>
