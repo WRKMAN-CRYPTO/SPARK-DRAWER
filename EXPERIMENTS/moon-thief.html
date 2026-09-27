@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<title>MOON THIEF • SPARK-DRAWER</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#070910;color:#f7f2df;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.hud{position:fixed;inset:0;pointer-events:none}
+.brand{position:absolute;top:max(12px,env(safe-area-inset-top));left:14px;display:flex;gap:9px;align-items:center;font-size:11px;letter-spacing:.16em;opacity:.82}
+.w{width:28px;height:28px;border:1px solid #d9d1a9;border-radius:7px;display:grid;place-items:center;font-weight:900;font-size:17px;box-shadow:0 0 24px #fff2 inset}
+.help{position:absolute;left:14px;right:14px;bottom:max(14px,env(safe-area-inset-bottom));text-align:center;font-size:11px;line-height:1.45;opacity:.5}
+.event{position:absolute;left:14px;right:14px;top:58px;text-align:center;font-size:10px;letter-spacing:.12em;opacity:0;transition:opacity .3s}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="brand"><div class="w">W</div><div>MOON THIEF</div></div>
+  <div class="event" id="event"></div>
+  <div class="help">drag the moon • tap it to scatter • somebody is watching</div>
+</div>
+<script>
+(() => {
+  const c=document.getElementById('c');
+  const g=c.getContext('2d',{alpha:false});
+  const eventEl=document.getElementById('event');
+  const TAU=Math.PI*2;
+  let W=0,H=0,D=1,last=performance.now(),time=0;
+  let moon=null, drag=false, pointer={x:0,y:0}, flash=0;
+  const dust=[], bodies=[], rings=[];
+  const rnd=(a,b)=>a+Math.random()*(b-a);
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+  function resize(){
+    D=Math.min(devicePixelRatio||1,2);
+    W=innerWidth; H=innerHeight;
+    c.width=Math.floor(W*D); c.height=Math.floor(H*D);
+    g.setTransform(D,0,0,D,0,0);
+    if(!moon) setup();
+  }
+  addEventListener('resize',resize,{passive:true});
+
+  function setup(){
+    moon={x:W*.52,y:H*.53,vx:0,vy:0,r:18,shine:1,id:0,age:0};
+    bodies.length=0;
+    for(let i=0;i<13;i++){
+      const a=i/13*TAU+rnd(-.18,.18), rr=rnd(52,Math.min(W,H)*.29);
+      const sp=Math.sqrt(1600/rr)*rnd(.78,1.18);
+      bodies.push({
+        x:moon.x+Math.cos(a)*rr,y:moon.y+Math.sin(a)*rr,
+        vx:-Math.sin(a)*sp,vy:Math.cos(a)*sp,
+        r:rnd(2.1,4.1),amb:rnd(0,1),glow:0,id:i+1,
+        trail:[]
+      });
+    }
+    dust.length=0;
+    for(let i=0;i<80;i++) dust.push({x:Math.random()*W,y:Math.random()*H,a:rnd(.08,.42),s:rnd(.5,1.4)});
+  }
+
+  function announce(msg){
+    eventEl.textContent=msg;
+    eventEl.style.opacity=1;
+    clearTimeout(announce.t);
+    announce.t=setTimeout(()=>eventEl.style.opacity=0,1100);
+  }
+
+  function pos(e){
+    const r=c.getBoundingClientRect();
+    return {x:e.clientX-r.left,y:e.clientY-r.top};
+  }
+
+  c.addEventListener('pointerdown',e=>{
+    c.setPointerCapture(e.pointerId);
+    pointer=pos(e);
+    const d=Math.hypot(pointer.x-moon.x,pointer.y-moon.y);
+    if(d<moon.r+22){
+      drag=true;
+      moon.vx*=.25; moon.vy*=.25;
+      if(navigator.vibrate) navigator.vibrate(4);
+    } else {
+      rings.push({x:pointer.x,y:pointer.y,r:2,a:.45});
+      for(const b of bodies){
+        const dx=b.x-pointer.x,dy=b.y-pointer.y,dd=Math.hypot(dx,dy)+.001;
+        const k=Math.max(0,1-dd/135);
+        b.vx+=dx/dd*k*34;
+        b.vy+=dy/dd*k*34;
+      }
+    }
+  });
+  c.addEventListener('pointermove',e=>{
+    if(!drag)return;
+    pointer=pos(e);
+  });
+  c.addEventListener('pointerup',e=>{
+    if(drag){
+      const p=pos(e), move=Math.hypot(p.x-pointer.x,p.y-pointer.y);
+      if(move<8){
+        for(const b of bodies){
+          const dx=b.x-moon.x,dy=b.y-moon.y,dd=Math.hypot(dx,dy)+.001;
+          if(dd<150){
+            const kick=(1-dd/150)*120;
+            b.vx+=dx/dd*kick; b.vy+=dy/dd*kick;
+          }
+        }
+        flash=1;
+        rings.push({x:moon.x,y:moon.y,r:moon.r,a:.9});
+        announce('the moon objects');
+      }
+    }
+    drag=false;
+  });
+  c.addEventListener('pointercancel',()=>drag=false);
+
+  function steal(thief){
+    const old={...moon};
+    moon={x:thief.x,y:thief.y,vx:thief.vx*.18,vy:thief.vy*.18,r:18,shine:1,id:thief.id,age:0};
+    thief.x=old.x; thief.y=old.y; thief.vx=old.vx+rnd(-8,8); thief.vy=old.vy+rnd(-8,8);
+    thief.r=rnd(2.8,4.2); thief.amb=.05; thief.glow=1; thief.trail=[];
+    flash=1;
+    rings.push({x:moon.x,y:moon.y,r:moon.r,a:1});
+    announce('THE MOON HAS BEEN STOLEN');
+    if(navigator.vibrate) navigator.vibrate([5,35,7]);
+  }
+
+  function step(dt){
+    time+=dt;
+    moon.age+=dt;
+    flash*=Math.pow(.03,dt);
+
+    if(drag){
+      const dx=pointer.x-moon.x,dy=pointer.y-moon.y;
+      moon.vx+=dx*dt*12; moon.vy+=dy*dt*12;
+      moon.vx*=Math.pow(.035,dt); moon.vy*=Math.pow(.035,dt);
+    } else {
+      moon.vx+=Math.sin(time*.19)*dt*.7;
+      moon.vy+=Math.cos(time*.16)*dt*.7;
+      moon.vx*=Math.pow(.72,dt); moon.vy*=Math.pow(.72,dt);
+    }
+
+    moon.x+=moon.vx*dt; moon.y+=moon.vy*dt;
+    const pad=44;
+    if(moon.x<pad){moon.x=pad;moon.vx=Math.abs(moon.vx)}
+    if(moon.x>W-pad){moon.x=W-pad;moon.vx=-Math.abs(moon.vx)}
+    if(moon.y<78){moon.y=78;moon.vy=Math.abs(moon.vy)}
+    if(moon.y>H-pad){moon.y=H-pad;moon.vy=-Math.abs(moon.vy)}
+
+    for(const b of bodies){
+      const dx=moon.x-b.x,dy=moon.y-b.y;
+      const d2=dx*dx+dy*dy, d=Math.sqrt(d2)+.001;
+      const grav=clamp(1900/d2,3,90);
+      b.vx+=dx/d*grav*dt;
+      b.vy+=dy/d*grav*dt;
+
+      // A tiny sideways preference keeps their orbits imperfect but readable.
+      const spin=(b.id%2?1:-1)*.75;
+      b.vx+=-dy/d*spin*dt;
+      b.vy+= dx/d*spin*dt;
+
+      b.vx*=Math.pow(.994,dt*60);
+      b.vy*=Math.pow(.994,dt*60);
+      b.x+=b.vx*dt; b.y+=b.vy*dt;
+
+      // Keep bodies apart so they never collapse into a visual knot.
+      for(const o of bodies){
+        if(o===b)continue;
+        const sx=b.x-o.x,sy=b.y-o.y,sd2=sx*sx+sy*sy;
+        const min=(b.r+o.r+4);
+        if(sd2>0 && sd2<min*min){
+          const sd=Math.sqrt(sd2), push=(min-sd)*2.6;
+          b.x+=sx/sd*push*.5; b.y+=sy/sd*push*.5;
+          b.vx+=sx/sd*push; b.vy+=sy/sd*push;
+        }
+      }
+
+      if(b.x<-20){b.x=W+20} if(b.x>W+20){b.x=-20}
+      if(b.y<54){b.y=H+16} if(b.y>H+20){b.y=60}
+
+      b.amb=clamp(b.amb+dt*rnd(-.025,.045),0,1);
+      b.glow*=Math.pow(.08,dt);
+
+      const rel=Math.hypot(b.vx-moon.vx,b.vy-moon.vy);
+      if(d<moon.r+10 && moon.age>5 && b.amb>.93 && rel<34 && Math.random()<dt*.75){
+        steal(b);
+        break;
+      }
+
+      b.trail.push([b.x,b.y]);
+      if(b.trail.length>7)b.trail.shift();
+    }
+
+    // Rare ambition flare: gives the player a visual suspect before a theft.
+    if(Math.random()<dt*.28){
+      const b=bodies[(Math.random()*bodies.length)|0];
+      if(b.amb>.72)b.glow=Math.max(b.glow,.35);
+    }
+
+    for(const r of rings){r.r+=dt*95;r.a*=Math.pow(.18,dt)}
+    while(rings.length&&rings[0].a<.02)rings.shift();
+  }
+
+  function draw(){
+    g.fillStyle='#070910'; g.fillRect(0,0,W,H);
+
+    for(const s of dust){
+      const tw=.55+.45*Math.sin(time*s.s+s.x*.03);
+      g.fillStyle='rgba(218,224,232,'+(s.a*tw)+')';
+      g.fillRect(Math.round(s.x),Math.round(s.y),1,1);
+    }
+
+    // faint field around current moon
+    const grd=g.createRadialGradient(moon.x,moon.y,0,moon.x,moon.y,110);
+    grd.addColorStop(0,'rgba(232,220,164,.075)');
+    grd.addColorStop(1,'rgba(232,220,164,0)');
+    g.fillStyle=grd; g.beginPath(); g.arc(moon.x,moon.y,110,0,TAU); g.fill();
+
+    for(const r of rings){
+      g.strokeStyle='rgba(235,226,188,'+r.a+')';
+      g.lineWidth=1;
+      g.beginPath(); g.arc(r.x,r.y,r.r,0,TAU); g.stroke();
+    }
+
+    for(const b of bodies){
+      if(b.trail.length>1){
+        g.strokeStyle='rgba(170,178,197,'+(.07+b.glow*.12)+')';
+        g.lineWidth=1;
+        g.beginPath();
+        b.trail.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));
+        g.stroke();
+      }
+      if(b.glow>.08){
+        g.fillStyle='rgba(232,220,164,'+(b.glow*.16)+')';
+        g.beginPath(); g.arc(b.x,b.y,b.r+9*b.glow,0,TAU); g.fill();
+      }
+      g.fillStyle=b.amb>.9?'#e8dca4':'#9ea8bd';
+      g.beginPath(); g.arc(b.x,b.y,b.r,0,TAU); g.fill();
+    }
+
+    g.save();
+    g.translate(moon.x,moon.y);
+    const halo=.12+flash*.28;
+    g.fillStyle='rgba(245,232,174,'+halo+')';
+    g.beginPath();g.arc(0,0,moon.r+10+flash*8,0,TAU);g.fill();
+    g.fillStyle='#e8dca4';
+    g.beginPath();g.arc(0,0,moon.r,0,TAU);g.fill();
+    g.fillStyle='#8e845f';
+    g.beginPath();g.arc(-6,-4,3.5,0,TAU);g.fill();
+    g.beginPath();g.arc(7,6,2.4,0,TAU);g.fill();
+    g.fillStyle='#070910';
+    g.beginPath();g.arc(9,-1,moon.r*.86,Math.PI*.56,Math.PI*1.44);g.fill();
+    g.restore();
+
+    // One tiny watcher, always opposite the current moon's drift.
+    const ang=Math.atan2(moon.vy,moon.vx)+Math.PI;
+    const wx=moon.x+Math.cos(ang)*31, wy=moon.y+Math.sin(ang)*31;
+    g.fillStyle='rgba(247,242,223,.42)';
+    g.fillRect(Math.round(wx),Math.round(wy),1,1);
+  }
+
+  function loop(now){
+    const dt=Math.min(.033,(now-last)/1000||.016);
+    last=now; step(dt); draw(); requestAnimationFrame(loop);
+  }
+
+  resize(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
