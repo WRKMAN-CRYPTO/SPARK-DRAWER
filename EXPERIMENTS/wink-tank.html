@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<title>WINK TANK • SPARK-DRAWER</title>
+<style>
+  :root{color-scheme:dark}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07110e;color:#d9ffe9;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;inset:0;pointer-events:none}
+  .brand{position:absolute;top:max(12px,env(safe-area-inset-top));left:14px;display:flex;align-items:center;gap:9px;font-size:11px;letter-spacing:.16em;opacity:.85}
+  .w{width:28px;height:28px;border:1px solid #6fffb0;border-radius:7px;display:grid;place-items:center;font-weight:900;font-size:17px;box-shadow:0 0 24px #4cff9a33 inset}
+  .help{position:absolute;left:14px;right:14px;bottom:max(14px,env(safe-area-inset-bottom));font-size:11px;line-height:1.45;opacity:.6;text-align:center}
+  .counter{position:absolute;top:max(15px,env(safe-area-inset-top));right:14px;font-size:10px;opacity:.45}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="brand"><div class="w">W</div><div>WINK TANK</div></div>
+  <div class="counter" id="counter"></div>
+  <div class="help">tap = ripple • drag = current • two-finger tap = hatch</div>
+</div>
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', {alpha:false});
+  const counter = document.getElementById('counter');
+  let W=0,H=0,D=1,t=0,last=performance.now(),blinkWave=0;
+  const bugs=[], ripples=[], trails=[];
+  const rand=(a,b)=>a+Math.random()*(b-a);
+  const wrap=(v,m)=>(v+m)%m;
+  const lerp=(a,b,k)=>a+(b-a)*k;
+  const TAU=Math.PI*2;
+
+  function resize(){
+    D=Math.min(2,devicePixelRatio||1);
+    W=innerWidth; H=innerHeight;
+    canvas.width=Math.floor(W*D); canvas.height=Math.floor(H*D);
+    ctx.setTransform(D,0,0,D,0,0);
+  }
+  addEventListener('resize',resize,{passive:true}); resize();
+
+  function hatch(x=rand(20,W-20), y=rand(60,H-30)){
+    const a=rand(0,TAU), speed=rand(18,42);
+    bugs.push({
+      x,y, px:x, py:y, vx:Math.cos(a)*speed, vy:Math.sin(a)*speed,
+      phase:rand(0,TAU), tempo:rand(.8,1.35), size:rand(4.5,7),
+      hue:rand(0,1), turn:rand(-1,1), pulse:0, id:Math.random()
+    });
+    if(bugs.length>70) bugs.shift();
+  }
+  for(let i=0;i<24;i++) hatch();
+
+  function ripple(x,y,power=1){
+    ripples.push({x,y,r:1,a:.9,power});
+    for(const b of bugs){
+      const dx=x-b.x, dy=y-b.y, d=Math.hypot(dx,dy)+.001;
+      const reach=Math.max(0,1-d/Math.max(W,H));
+      if(reach>0){
+        const desired=Math.atan2(dy,dx);
+        const cur=Math.atan2(b.vy,b.vx);
+        let da=((desired-cur+Math.PI*3)%TAU)-Math.PI;
+        const na=cur+da*(.16+.28*reach)*power;
+        const sp=Math.hypot(b.vx,b.vy);
+        b.vx=Math.cos(na)*sp; b.vy=Math.sin(na)*sp;
+        b.pulse=Math.max(b.pulse,reach);
+      }
+    }
+  }
+
+  let active=new Map(), dragLast=null;
+  function pos(e){const r=canvas.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top}}
+  canvas.addEventListener('pointerdown',e=>{
+    canvas.setPointerCapture(e.pointerId);
+    const p=pos(e); active.set(e.pointerId,p);
+    if(active.size===1){ ripple(p.x,p.y,1); dragLast=p; }
+    if(active.size===2){
+      const ps=[...active.values()];
+      hatch((ps[0].x+ps[1].x)/2,(ps[0].y+ps[1].y)/2);
+      hatch((ps[0].x+ps[1].x)/2+rand(-8,8),(ps[0].y+ps[1].y)/2+rand(-8,8));
+    }
+  });
+  canvas.addEventListener('pointermove',e=>{
+    if(!active.has(e.pointerId))return;
+    const p=pos(e), old=active.get(e.pointerId); active.set(e.pointerId,p);
+    if(active.size===1 && dragLast){
+      const dx=p.x-old.x,dy=p.y-old.y;
+      if(dx*dx+dy*dy>2){
+        for(const b of bugs){
+          const d=Math.hypot(p.x-b.x,p.y-b.y);
+          const k=Math.max(0,1-d/110);
+          b.vx+=dx*k*1.8; b.vy+=dy*k*1.8;
+        }
+        if(Math.hypot(p.x-dragLast.x,p.y-dragLast.y)>20){
+          ripples.push({x:p.x,y:p.y,r:1,a:.25,power:.4}); dragLast=p;
+        }
+      }
+    }
+  });
+  const end=e=>{active.delete(e.pointerId); if(!active.size)dragLast=null};
+  canvas.addEventListener('pointerup',end); canvas.addEventListener('pointercancel',end);
+
+  function step(dt){
+    t+=dt;
+    // phase coupling: nearby swimmers gently share blink timing
+    for(let i=0;i<bugs.length;i++){
+      const a=bugs[i];
+      a.phase=(a.phase+dt*a.tempo*2.2)%TAU;
+      a.pulse*=Math.pow(.07,dt);
+      for(let j=i+1;j<bugs.length;j++){
+        const b=bugs[j], dx=b.x-a.x,dy=b.y-a.y, d2=dx*dx+dy*dy;
+        if(d2<34*34){
+          const diff=Math.atan2(Math.sin(b.phase-a.phase),Math.cos(b.phase-a.phase));
+          a.phase+=diff*dt*.7; b.phase-=diff*dt*.7;
+          if(d2<12*12){
+            const tx=a.vx;a.vx=b.vx*.88;b.vx=tx*.88;
+            const ty=a.vy;a.vy=b.vy*.88;b.vy=ty*.88;
+          }
+        }
+      }
+    }
+
+    for(const b of bugs){
+      b.px=b.x;b.py=b.y;
+      const a=Math.atan2(b.vy,b.vx)+Math.sin(t*.7+b.id*10)*b.turn*.15*dt;
+      let sp=Math.hypot(b.vx,b.vy);
+      sp=lerp(sp,30+b.size*1.5,.35*dt);
+      b.vx=Math.cos(a)*sp;b.vy=Math.sin(a)*sp;
+      b.x=wrap(b.x+b.vx*dt,W); b.y=wrap(b.y+b.vy*dt,H);
+      if(Math.random()<dt*1.2) trails.push({x:b.x,y:b.y,a:.16,s:b.size*.35});
+    }
+
+    for(const r of ripples){r.r+=dt*(100+70*r.power);r.a*=Math.pow(.055,dt)}
+    while(ripples.length&&ripples[0].a<.015)ripples.shift();
+    for(const q of trails)q.a*=Math.pow(.06,dt);
+    while(trails.length&&trails[0].a<.01)trails.shift();
+
+    // Global flash if enough eyes happen to blink together.
+    let closed=0;
+    for(const b of bugs) if(Math.cos(b.phase)>.965) closed++;
+    const ratio=closed/Math.max(1,bugs.length);
+    blinkWave=lerp(blinkWave,ratio>.24?1:0,dt*8);
+  }
+
+  function draw(){
+    ctx.fillStyle='#07110e';ctx.fillRect(0,0,W,H);
+
+    // faint tank grid
+    ctx.strokeStyle='rgba(111,255,176,.035)';ctx.lineWidth=1;
+    const g=32;
+    ctx.beginPath();
+    for(let x=(t*3)%g;x<W;x+=g){ctx.moveTo(x,0);ctx.lineTo(x,H)}
+    for(let y=0;y<H;y+=g){ctx.moveTo(0,y);ctx.lineTo(W,y)}
+    ctx.stroke();
+
+    for(const q of trails){
+      ctx.fillStyle=`rgba(120,255,190,${q.a})`;
+      ctx.beginPath();ctx.arc(q.x,q.y,q.s,0,TAU);ctx.fill();
+    }
+
+    for(const r of ripples){
+      ctx.strokeStyle=`rgba(125,255,196,${r.a})`;ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.arc(r.x,r.y,r.r,0,TAU);ctx.stroke();
+      ctx.strokeStyle=`rgba(125,255,196,${r.a*.25})`;
+      ctx.beginPath();ctx.arc(r.x,r.y,r.r*.68,0,TAU);ctx.stroke();
+    }
+
+    if(blinkWave>.01){
+      ctx.fillStyle=`rgba(90,255,170,${blinkWave*.035})`;
+      ctx.fillRect(0,0,W,H);
+    }
+
+    for(const b of bugs){
+      const ang=Math.atan2(b.vy,b.vx), closed=Math.cos(b.phase)>.965;
+      ctx.save();ctx.translate(b.x,b.y);ctx.rotate(ang);
+      // body
+      ctx.fillStyle=`rgba(126,255,190,${.55+b.pulse*.35})`;
+      ctx.beginPath();ctx.ellipse(0,0,b.size*1.65,b.size,0,0,TAU);ctx.fill();
+      // tail
+      ctx.strokeStyle='rgba(126,255,190,.35)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(-b.size*1.2,0);ctx.quadraticCurveTo(-b.size*2.2,Math.sin(t*7+b.id*9)*4,-b.size*2.8,0);ctx.stroke();
+      // one eye
+      ctx.fillStyle='#07110e';
+      if(closed){
+        ctx.fillRect(b.size*.45,-.45,b.size*.72,.9);
+      }else{
+        ctx.beginPath();ctx.ellipse(b.size*.78,0,b.size*.42,b.size*.52,0,0,TAU);ctx.fill();
+        ctx.fillStyle='#d9ffe9';ctx.beginPath();ctx.arc(b.size*.92,-b.size*.12,Math.max(1,b.size*.11),0,TAU);ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    counter.textContent=`${bugs.length} eyes • ${ripples.length} echoes`;
+  }
+
+  function loop(now){
+    const dt=Math.min(.033,(now-last)/1000||.016); last=now;
+    step(dt);draw();requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
