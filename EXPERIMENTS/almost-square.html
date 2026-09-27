@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Almost Square</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b0d10;overflow:hidden}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .label{position:fixed;left:12px;bottom:10px;color:#9aa3ad;font:12px/1.3 system-ui,sans-serif;opacity:.7;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="label">almost square</div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+let dpr=Math.max(1,Math.min(2,devicePixelRatio||1)),w=0,h=0,t=0;
+let pointer={x:0,y:0,active:false};
+
+function resize(){
+  w=innerWidth; h=innerHeight;
+  c.width=Math.floor(w*dpr); c.height=Math.floor(h*dpr);
+  c.style.width=w+'px'; c.style.height=h+'px';
+  x.setTransform(dpr,0,0,dpr,0,0);
+}
+addEventListener('resize',resize); resize();
+
+function pos(e){
+  const r=c.getBoundingClientRect();
+  return {x:e.clientX-r.left,y:e.clientY-r.top};
+}
+c.addEventListener('pointerdown',e=>{pointer={...pos(e),active:true}; c.setPointerCapture(e.pointerId)});
+c.addEventListener('pointermove',e=>{if(pointer.active) pointer={...pos(e),active:true}});
+c.addEventListener('pointerup',e=>{pointer.active=false});
+c.addEventListener('pointercancel',e=>{pointer.active=false});
+
+const phases=[.2,1.7,3.1,4.8];
+
+function wobble(i,amount){
+  const a=Math.sin(t*.73+phases[i])*amount;
+  const b=Math.cos(t*.91+phases[(i+1)%4])*amount;
+  return [a,b];
+}
+
+function frame(ms){
+  t=ms/1000;
+  x.clearRect(0,0,w,h);
+
+  const s=Math.min(w,h)*0.36;
+  const cx=w/2, cy=h/2;
+  const ideal=[
+    [cx-s,cy-s],
+    [cx+s,cy-s],
+    [cx+s,cy+s],
+    [cx-s,cy+s]
+  ];
+
+  let attention=0;
+  if(pointer.active){
+    const dx=pointer.x-cx, dy=pointer.y-cy;
+    const dist=Math.hypot(dx,dy);
+    const radius=Math.min(w,h)*0.65;
+    attention=Math.max(0,1-dist/radius);
+  }
+
+  const error=18*(1-attention*.94);
+  const pts=ideal.map((p,i)=>{
+    const [ox,oy]=wobble(i,error);
+    return [p[0]+ox,p[1]+oy];
+  });
+
+  x.lineWidth=2;
+  x.strokeStyle='rgba(235,239,244,.9)';
+  x.beginPath();
+  x.moveTo(pts[0][0],pts[0][1]);
+  for(let i=1;i<4;i++) x.lineTo(pts[i][0],pts[i][1]);
+  x.closePath(); x.stroke();
+
+  for(let i=0;i<4;i++){
+    x.fillStyle='rgba(235,239,244,.95)';
+    x.beginPath(); x.arc(pts[i][0],pts[i][1],3,0,Math.PI*2); x.fill();
+  }
+
+  if(pointer.active){
+    x.strokeStyle='rgba(180,190,200,.18)';
+    x.beginPath(); x.arc(pointer.x,pointer.y,10,0,Math.PI*2); x.stroke();
+  }
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
