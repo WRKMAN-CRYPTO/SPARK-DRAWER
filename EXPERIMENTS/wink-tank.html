@@ -115,9 +115,23 @@
         if(d2<34*34){
           const diff=Math.atan2(Math.sin(b.phase-a.phase),Math.cos(b.phase-a.phase));
           a.phase+=diff*dt*.7; b.phase-=diff*dt*.7;
-          if(d2<12*12){
-            const tx=a.vx;a.vx=b.vx*.88;b.vx=tx*.88;
-            const ty=a.vy;a.vy=b.vy*.88;b.vy=ty*.88;
+          if(d2<18*18){
+            let d=Math.sqrt(d2), nx, ny;
+            if(d>.001){
+              nx=dx/d; ny=dy/d;
+            }else{
+              const seed=(a.id-b.id)*9876.54321;
+              nx=Math.cos(seed); ny=Math.sin(seed);
+              d=.001;
+            }
+            const overlap=(18-d)/18;
+            const shove=34*overlap*overlap*dt;
+            a.vx-=nx*shove; a.vy-=ny*shove;
+            b.vx+=nx*shove; b.vy+=ny*shove;
+            const avx=a.vx, avy=a.vy;
+            const mix=.12*overlap*dt;
+            a.vx=lerp(a.vx,b.vx,mix); a.vy=lerp(a.vy,b.vy,mix);
+            b.vx=lerp(b.vx,avx,mix); b.vy=lerp(b.vy,avy,mix);
           }
         }
       }
