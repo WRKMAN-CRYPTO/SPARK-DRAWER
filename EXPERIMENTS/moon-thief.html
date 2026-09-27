@@ -30,7 +30,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
   const eventEl=document.getElementById('event');
   const TAU=Math.PI*2;
   let W=0,H=0,D=1,last=performance.now(),time=0;
-  let moon=null, drag=false, pointer={x:0,y:0}, flash=0;
+  let moon=null, drag=false, pointer={x:0,y:0}, down={x:0,y:0}, flash=0;
   const dust=[], bodies=[], rings=[];
   const rnd=(a,b)=>a+Math.random()*(b-a);
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -76,6 +76,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
   c.addEventListener('pointerdown',e=>{
     c.setPointerCapture(e.pointerId);
     pointer=pos(e);
+    down={...pointer};
     const d=Math.hypot(pointer.x-moon.x,pointer.y-moon.y);
     if(d<moon.r+22){
       drag=true;
@@ -97,7 +98,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
   });
   c.addEventListener('pointerup',e=>{
     if(drag){
-      const p=pos(e), move=Math.hypot(p.x-pointer.x,p.y-pointer.y);
+      const p=pos(e), move=Math.hypot(p.x-down.x,p.y-down.y);
       if(move<8){
         for(const b of bodies){
           const dx=b.x-moon.x,dy=b.y-moon.y,dd=Math.hypot(dx,dy)+.001;
@@ -155,7 +156,6 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
       b.vx+=dx/d*grav*dt;
       b.vy+=dy/d*grav*dt;
 
-      // A tiny sideways preference keeps their orbits imperfect but readable.
       const spin=(b.id%2?1:-1)*.75;
       b.vx+=-dy/d*spin*dt;
       b.vy+= dx/d*spin*dt;
@@ -164,7 +164,6 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
       b.vy*=Math.pow(.994,dt*60);
       b.x+=b.vx*dt; b.y+=b.vy*dt;
 
-      // Keep bodies apart so they never collapse into a visual knot.
       for(const o of bodies){
         if(o===b)continue;
         const sx=b.x-o.x,sy=b.y-o.y,sd2=sx*sx+sy*sy;
@@ -192,7 +191,6 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
       if(b.trail.length>7)b.trail.shift();
     }
 
-    // Rare ambition flare: gives the player a visual suspect before a theft.
     if(Math.random()<dt*.28){
       const b=bodies[(Math.random()*bodies.length)|0];
       if(b.amb>.72)b.glow=Math.max(b.glow,.35);
@@ -211,7 +209,6 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
       g.fillRect(Math.round(s.x),Math.round(s.y),1,1);
     }
 
-    // faint field around current moon
     const grd=g.createRadialGradient(moon.x,moon.y,0,moon.x,moon.y,110);
     grd.addColorStop(0,'rgba(232,220,164,.075)');
     grd.addColorStop(1,'rgba(232,220,164,0)');
@@ -253,7 +250,6 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
     g.beginPath();g.arc(9,-1,moon.r*.86,Math.PI*.56,Math.PI*1.44);g.fill();
     g.restore();
 
-    // One tiny watcher, always opposite the current moon's drift.
     const ang=Math.atan2(moon.vy,moon.vx)+Math.PI;
     const wx=moon.x+Math.cos(ang)*31, wy=moon.y+Math.sin(ang)*31;
     g.fillStyle='rgba(247,242,223,.42)';
