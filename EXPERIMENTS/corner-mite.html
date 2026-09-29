@@ -1,76 +1,76 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Corner Mite</title><style>
-*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#090b0a;color:#e7efe9;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;touch-action:none;user-select:none}
-#wrap{position:fixed;inset:0;background:radial-gradient(circle at 50% 35%,#18211c,#080a09 72%)}canvas{position:absolute;inset:0;width:100%;height:100%}
-#hud{position:absolute;left:14px;right:14px;top:max(12px,env(safe-area-inset-top));display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#090b0a;color:#e7efe9;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;touch-action:none;user-select:none;-webkit-user-select:none}
+#wrap{position:fixed;inset:0;overflow:hidden;background:radial-gradient(circle at 50% 35%,#18211c,#080a09 72%)}
+#field{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+.wall{stroke:#86e89b;stroke-width:8;stroke-linecap:round;filter:drop-shadow(0 0 5px #75ff8a88)}
+.wallCore{stroke:#d7ffe0;stroke-width:1.5;stroke-linecap:round;pointer-events:none}
+.preview{stroke:#b6ff76;stroke-width:5;stroke-linecap:round;stroke-dasharray:10 8;filter:drop-shadow(0 0 6px #8fff6a);pointer-events:none}
+#mite{position:absolute;width:28px;height:20px;margin:-10px -14px;pointer-events:none;transform-origin:50% 50%;filter:drop-shadow(0 0 9px #8fff6a);z-index:4}
+#mite .body{position:absolute;left:5px;top:4px;width:18px;height:12px;border-radius:50%;background:#b9ff7e;border:1px solid #e7ffd4}
+#mite .eye{position:absolute;top:7px;width:3px;height:3px;border-radius:50%;background:#142017;z-index:2}.e1{left:17px}.e2{left:20px}
+#mite i{position:absolute;left:2px;width:10px;height:1px;background:#b9ff7e;transform-origin:right center}.l1{top:4px;rotate:25deg}.l2{top:9px}.l3{top:14px;rotate:-25deg}.r1{top:4px;left:16px;rotate:-25deg}.r2{top:9px;left:16px}.r3{top:14px;left:16px;rotate:25deg}
+#nest{position:absolute;width:64px;height:64px;margin:-32px;pointer-events:none;opacity:0;border-radius:50%;background:radial-gradient(circle,#c8ffd022 0 12%,transparent 14%);z-index:2}
+#hud{position:absolute;left:14px;right:14px;top:max(12px,env(safe-area-inset-top));display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;z-index:5}
 h1{margin:0;font-size:16px;letter-spacing:.12em}.sub{margin-top:5px;font-size:9px;line-height:1.5;color:#90a097;max-width:270px}
-#badge{border:1px solid #395144;background:#101713cc;border-radius:999px;padding:7px 9px;font-size:9px;color:#a6f48e}
-#hint{position:absolute;left:14px;right:14px;bottom:max(14px,env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center}
-button{border:1px solid #395144;background:#111a15dd;color:#e7efe9;border-radius:12px;padding:11px 13px;font:700 10px ui-monospace,monospace;letter-spacing:.06em}
-#msg{flex:1;text-align:right;font-size:9px;color:#8fa097;line-height:1.4}
-#stamp{position:absolute;right:15px;bottom:64px;font:900 22px Georgia,serif;color:#92ff74;opacity:.18;transform:rotate(-8deg);pointer-events:none}
-</style></head><body><div id="wrap"><canvas id="c"></canvas>
+#badge{border:1px solid #395144;background:#101713dd;border-radius:999px;padding:7px 9px;font-size:9px;color:#a6f48e}
+#hint{position:absolute;left:14px;right:14px;bottom:max(14px,env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center;z-index:6}
+button{border:1px solid #395144;background:#111a15ee;color:#e7efe9;border-radius:12px;padding:11px 13px;font:700 10px ui-monospace,monospace;letter-spacing:.06em;touch-action:manipulation}
+#msg{flex:1;text-align:right;font-size:9px;color:#8fa097;line-height:1.4;pointer-events:none}
+#stamp{position:absolute;right:15px;bottom:64px;font:900 22px Georgia,serif;color:#92ff74;opacity:.18;transform:rotate(-8deg);pointer-events:none;z-index:3}
+</style></head><body><div id="wrap">
+<svg id="field" aria-label="Draw walls here"></svg>
+<div id="nest"></div>
+<div id="mite"><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="r1"></i><i class="r2"></i><i class="r3"></i><div class="body"></div><b class="eye e1"></b><b class="eye e2"></b></div>
 <div id="hud"><div><h1>CORNER MITE</h1><div class="sub">It dislikes open space. Drag to build little walls. It will decide whether your architecture is acceptable.</div></div><div id="badge">COMFORT 0</div></div>
-<div id="stamp">W</div><div id="hint"><button id="clear">CLEAR WALLS</button><div id="msg">drag anywhere to draw a wall</div></div></div>
-<script>
-(()=>{const c=document.querySelector('#c'),ctx=c.getContext('2d'),badge=document.querySelector('#badge'),msg=document.querySelector('#msg');
-let W=innerWidth,H=innerHeight,dpr=Math.min(2,devicePixelRatio||1),walls=[],drawing=null,comfort=0,last=performance.now();
-const mite={x:innerWidth*.5,y:innerHeight*.55,vx:1.35,vy:.35,ang:0,blink:0,nest:0};
-function resize(){W=innerWidth;H=innerHeight;dpr=Math.min(2,devicePixelRatio||1);c.width=W*dpr;c.height=H*dpr;c.style.width=W+'px';c.style.height=H+'px';ctx.setTransform(dpr,0,0,dpr,0,0)}
-addEventListener('resize',resize);resize();
-function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
-function nearestOnSeg(px,py,a,b){const dx=b.x-a.x,dy=b.y-a.y,l=dx*dx+dy*dy||1,t=clamp(((px-a.x)*dx+(py-a.y)*dy)/l,0,1);return{x:a.x+dx*t,y:a.y+dy*t,t}}
-function allSegs(){return[{a:{x:0,y:0},b:{x:W,y:0},edge:1},{a:{x:W,y:0},b:{x:W,y:H},edge:1},{a:{x:W,y:H},b:{x:0,y:H},edge:1},{a:{x:0,y:H},b:{x:0,y:0},edge:1},...walls.map(w=>({a:w.a,b:w.b,edge:0}))]}
-function nearestWalls(){
- const arr=[];for(const s of allSegs()){const p=nearestOnSeg(mite.x,mite.y,s.a,s.b),dx=p.x-mite.x,dy=p.y-mite.y,d=Math.hypot(dx,dy);arr.push({s,p,dx,dy,d})}
- arr.sort((a,b)=>a.d-b.d);return arr.slice(0,3)
+<div id="stamp">W</div><div id="hint"><button id="clear">CLEAR WALLS</button><div id="msg">drag anywhere to draw a wall</div></div>
+</div><script>
+(()=>{const field=document.querySelector('#field'),miteEl=document.querySelector('#mite'),nestEl=document.querySelector('#nest'),badge=document.querySelector('#badge'),msg=document.querySelector('#msg'),NS='http://www.w3.org/2000/svg';
+let W=innerWidth,H=innerHeight,walls=[],drawing=null,comfort=0,activePointer=null;
+const mite={x:innerWidth*.5,y:innerHeight*.55,vx:1.15,vy:.42,ang:0,nest:0};
+function size(){W=innerWidth;H=innerHeight;field.setAttribute('viewBox','0 0 '+W+' '+H);mite.x=Math.max(8,Math.min(W-8,mite.x));mite.y=Math.max(8,Math.min(H-8,mite.y))}
+addEventListener('resize',size);size();
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function nearestOnSeg(px,py,a,b){const dx=b.x-a.x,dy=b.y-a.y,l=dx*dx+dy*dy||1,t=clamp(((px-a.x)*dx+(py-a.y)*dy)/l,0,1);return{x:a.x+dx*t,y:a.y+dy*t}}
+function segs(){return[{a:{x:0,y:0},b:{x:W,y:0}},{a:{x:W,y:0},b:{x:W,y:H}},{a:{x:W,y:H},b:{x:0,y:H}},{a:{x:0,y:H},b:{x:0,y:0}},...walls]}
+function nearest(){const out=[];for(const s of segs()){const p=nearestOnSeg(mite.x,mite.y,s.a,s.b),dx=p.x-mite.x,dy=p.y-mite.y,d=Math.hypot(dx,dy);out.push({s,p,dx,dy,d})}out.sort((a,b)=>a.d-b.d);return out.slice(0,3)}
+function addLine(a,b,klass){const l=document.createElementNS(NS,'line');l.setAttribute('x1',a.x);l.setAttribute('y1',a.y);l.setAttribute('x2',b.x);l.setAttribute('y2',b.y);l.setAttribute('class',klass);field.appendChild(l);return l}
+function commitWall(a,b){
+ const wall={a:{...a},b:{...b},els:[]};wall.els.push(addLine(wall.a,wall.b,'wall'));wall.els.push(addLine(wall.a,wall.b,'wallCore'));walls.push(wall);
+ if(walls.length>18){const old=walls.shift();old.els.forEach(x=>x.remove())}
 }
-function step(dt){
- const n=nearestWalls(),a=n[0],b=n[1];let ax=0,ay=0;
+function tick(){
+ const n=nearest(),a=n[0],b=n[1];let ax=0,ay=0,corner=false;
  if(a){
-  const pull=clamp((110-a.d)/110,0,1)*.055;ax+=a.dx/(a.d||1)*pull;ay+=a.dy/(a.d||1)*pull;
-  const sx=a.s.b.x-a.s.a.x,sy=a.s.b.y-a.s.a.y,sl=Math.hypot(sx,sy)||1,tx=sx/sl,ty=sy/sl;
-  if(mite.vx*tx+mite.vy*ty<0){tx=-tx;ty=-ty}ax+=tx*.018;ay+=ty*.018
+  const pull=clamp((150-a.d)/150,0,1)*.045;ax+=a.dx/(a.d||1)*pull;ay+=a.dy/(a.d||1)*pull;
+  const sx=a.s.b.x-a.s.a.x,sy=a.s.b.y-a.s.a.y,sl=Math.hypot(sx,sy)||1;let tx=sx/sl,ty=sy/sl;if(mite.vx*tx+mite.vy*ty<0){tx=-tx;ty=-ty}ax+=tx*.012;ay+=ty*.012
  }
- let corner=false;
- if(a&&b&&a.d<52&&b.d<52){
-  const a1=Math.atan2(a.s.b.y-a.s.a.y,a.s.b.x-a.s.a.x),a2=Math.atan2(b.s.b.y-b.s.a.y,b.s.b.x-b.s.a.x);
-  const diff=Math.abs(Math.sin(a1-a2));if(diff>.35){corner=true;ax+=(a.dx/(a.d||1)+b.dx/(b.d||1))*.035;ay+=(a.dy/(a.d||1)+b.dy/(b.d||1))*.035}
+ if(a&&b&&a.d<58&&b.d<58){
+  const q1=Math.atan2(a.s.b.y-a.s.a.y,a.s.b.x-a.s.a.x),q2=Math.atan2(b.s.b.y-b.s.a.y,b.s.b.x-b.s.a.x);
+  if(Math.abs(Math.sin(q1-q2))>.35){corner=true;ax+=(a.dx/(a.d||1)+b.dx/(b.d||1))*.022;ay+=(a.dy/(a.d||1)+b.dy/(b.d||1))*.022}
  }
- if(corner){mite.nest=Math.min(180,mite.nest+dt*.08);mite.vx*=.992;mite.vy*=.992}else mite.nest=Math.max(0,mite.nest-dt*.12);
- const jitter=.003*Math.sin(performance.now()*.007);ax+=Math.cos(mite.ang+1.7)*jitter;ay+=Math.sin(mite.ang+1.7)*jitter;
- mite.vx+=ax*dt;mite.vy+=ay*dt;let sp=Math.hypot(mite.vx,mite.vy);const max=corner?1.2:2.8;if(sp>max){mite.vx=mite.vx/sp*max;mite.vy=mite.vy/sp*max}
- mite.x+=mite.vx*dt*.45;mite.y+=mite.vy*dt*.45;mite.x=clamp(mite.x,5,W-5);mite.y=clamp(mite.y,5,H-5);mite.ang=Math.atan2(mite.vy,mite.vx);
- const old=comfort;comfort=Math.round(clamp((1-(a?.d||120)/120)*55+(corner?45:0),0,100));if(comfort!==old)badge.textContent='COMFORT '+comfort;
- mite.blink=Math.max(0,mite.blink-dt);
- if(corner&&mite.nest>55)msg.textContent='it found a corner. productivity has ended.';
+ if(corner){mite.nest=Math.min(100,mite.nest+1.6);mite.vx*=.94;mite.vy*=.94}else mite.nest=Math.max(0,mite.nest-1.2);
+ const wob=Date.now()*.003;ax+=Math.cos(wob)*.006;ay+=Math.sin(wob*.83)*.006;mite.vx+=ax;mite.vy+=ay;
+ let sp=Math.hypot(mite.vx,mite.vy)||1,max=corner?.62:1.7;if(sp>max){mite.vx=mite.vx/sp*max;mite.vy=mite.vy/sp*max}
+ mite.x=clamp(mite.x+mite.vx,7,W-7);mite.y=clamp(mite.y+mite.vy,7,H-7);mite.ang=Math.atan2(mite.vy,mite.vx);
+ comfort=Math.round(clamp((1-(a?.d||160)/160)*55+(corner?45:0),0,100));badge.textContent='COMFORT '+comfort;
+ miteEl.style.left=mite.x+'px';miteEl.style.top=mite.y+'px';miteEl.style.transform='rotate('+mite.ang+'rad)';
+ nestEl.style.left=mite.x+'px';nestEl.style.top=mite.y+'px';nestEl.style.opacity=String(mite.nest/135);
+ if(corner&&mite.nest>60)msg.textContent='it found a corner. productivity has ended.';
  else if(comfort>70)msg.textContent='acceptable wall situation';
  else if(comfort<25)msg.textContent='deeply exposed';
- else msg.textContent='searching for a better architectural opinion';
+ else msg.textContent='searching for a better architectural opinion'
 }
-function draw(){
- ctx.clearRect(0,0,W,H);
- ctx.lineCap='round';
- for(const w of walls){ctx.strokeStyle='#4d6859';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(w.a.x,w.a.y);ctx.lineTo(w.b.x,w.b.y);ctx.stroke();ctx.strokeStyle='#9bcaaa';ctx.lineWidth=1.5;ctx.stroke()}
- if(drawing){ctx.strokeStyle='#9cff7e';ctx.lineWidth=3;ctx.setLineDash([7,7]);ctx.beginPath();ctx.moveTo(drawing.a.x,drawing.a.y);ctx.lineTo(drawing.b.x,drawing.b.y);ctx.stroke();ctx.setLineDash([])}
- const glow=.22+.22*Math.sin(performance.now()*.006);ctx.fillStyle='rgba(147,255,118,'+glow+')';ctx.beginPath();ctx.arc(mite.x,mite.y,16+mite.nest*.025,0,Math.PI*2);ctx.fill();
- ctx.save();ctx.translate(mite.x,mite.y);ctx.rotate(mite.ang);ctx.fillStyle='#b9ff7e';ctx.beginPath();ctx.ellipse(0,0,9,6,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#152218';ctx.beginPath();ctx.arc(4,-2,1.4,0,7);ctx.arc(4,2,1.4,0,7);ctx.fill();ctx.strokeStyle='#b9ff7e';ctx.lineWidth=1.5;for(const y of [-4,0,4]){ctx.beginPath();ctx.moveTo(-3,y);ctx.lineTo(-10,y+(y?Math.sign(y)*4:5));ctx.stroke()}ctx.restore();
- if(mite.nest>40){ctx.fillStyle='#c7ffd0';for(let i=0;i<Math.min(12,Math.floor(mite.nest/12));i++){const a=i*2.399+performance.now()*.0002,r=18+(i%4)*5;ctx.fillRect(mite.x+Math.cos(a)*r,mite.y+Math.sin(a)*r,2,2)}}
-}
-function loop(t){const dt=Math.min(32,t-last);last=t;step(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
-function pos(e){const r=c.getBoundingClientRect(),q=e.touches?.[0]||e.changedTouches?.[0]||e;return{x:q.clientX-r.left,y:q.clientY-r.top}}
-function startDraw(e){e.preventDefault?.();const p=pos(e);drawing={a:p,b:{...p}};msg.textContent='drawing wall…'}
-function moveDraw(e){if(!drawing)return;e.preventDefault?.();drawing.b=pos(e)}
-function endDraw(e){if(!drawing)return;e.preventDefault?.();drawing.b=pos(e);const len=Math.hypot(drawing.b.x-drawing.a.x,drawing.b.y-drawing.a.y);if(len>12){walls.push({a:{...drawing.a},b:{...drawing.b}});if(walls.length>18)walls.shift();msg.textContent='wall accepted by local zoning'}else msg.textContent='drag farther to make a wall';drawing=null}
-c.addEventListener('pointerdown',e=>{try{c.setPointerCapture?.(e.pointerId)}catch{}startDraw(e)});
-c.addEventListener('pointermove',moveDraw);
-c.addEventListener('pointerup',endDraw);
-c.addEventListener('pointercancel',()=>drawing=null);
-c.addEventListener('touchstart',startDraw,{passive:false});
-c.addEventListener('touchmove',moveDraw,{passive:false});
-c.addEventListener('touchend',endDraw,{passive:false});
-c.addEventListener('touchcancel',()=>drawing=null,{passive:false});
-document.querySelector('#clear').onclick=()=>{walls=[];msg.textContent='the mite has been evicted from geometry'};
+setInterval(tick,32);tick();
+function point(e){const r=field.getBoundingClientRect();return{x:clamp(e.clientX-r.left,0,r.width)*W/r.width,y:clamp(e.clientY-r.top,0,r.height)*H/r.height}}
+function start(e){if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();activePointer=e.pointerId;try{field.setPointerCapture(activePointer)}catch{}const p=point(e);drawing={a:p,b:{...p},preview:addLine(p,p,'preview')};msg.textContent='drawing wall…'}
+function move(e){if(!drawing||e.pointerId!==activePointer)return;e.preventDefault();drawing.b=point(e);drawing.preview.setAttribute('x2',drawing.b.x);drawing.preview.setAttribute('y2',drawing.b.y)}
+function finish(e){if(!drawing||e.pointerId!==activePointer)return;e.preventDefault();const b=point(e),a=drawing.a,len=Math.hypot(b.x-a.x,b.y-a.y);drawing.preview.remove();drawing=null;activePointer=null;if(len>12){commitWall(a,b);msg.textContent='wall accepted by local zoning'}else msg.textContent='drag farther to make a wall'}
+field.addEventListener('pointerdown',start);
+field.addEventListener('pointermove',move);
+field.addEventListener('pointerup',finish);
+field.addEventListener('pointercancel',e=>{if(drawing){drawing.preview.remove();drawing=null}activePointer=null});
+document.querySelector('#clear').onclick=e=>{e.preventDefault();walls.forEach(w=>w.els.forEach(x=>x.remove()));walls=[];msg.textContent='the mite has been evicted from geometry'};
 })();
 </script></body></html>
