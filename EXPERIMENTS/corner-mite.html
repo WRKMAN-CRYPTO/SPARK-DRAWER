@@ -59,11 +59,18 @@ function draw(){
  if(mite.nest>40){ctx.fillStyle='#c7ffd0';for(let i=0;i<Math.min(12,Math.floor(mite.nest/12));i++){const a=i*2.399+performance.now()*.0002,r=18+(i%4)*5;ctx.fillRect(mite.x+Math.cos(a)*r,mite.y+Math.sin(a)*r,2,2)}}
 }
 function loop(t){const dt=Math.min(32,t-last);last=t;step(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
-function pos(e){const r=c.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
-c.addEventListener('pointerdown',e=>{c.setPointerCapture(e.pointerId);const p=pos(e);drawing={a:p,b:p}});
-c.addEventListener('pointermove',e=>{if(drawing)drawing.b=pos(e)});
-c.addEventListener('pointerup',e=>{if(!drawing)return;drawing.b=pos(e);if(Math.hypot(drawing.b.x-drawing.a.x,drawing.b.y-drawing.a.y)>24){walls.push(drawing);if(walls.length>18)walls.shift()}drawing=null});
+function pos(e){const r=c.getBoundingClientRect(),q=e.touches?.[0]||e.changedTouches?.[0]||e;return{x:q.clientX-r.left,y:q.clientY-r.top}}
+function startDraw(e){e.preventDefault?.();const p=pos(e);drawing={a:p,b:{...p}};msg.textContent='drawing wall…'}
+function moveDraw(e){if(!drawing)return;e.preventDefault?.();drawing.b=pos(e)}
+function endDraw(e){if(!drawing)return;e.preventDefault?.();drawing.b=pos(e);const len=Math.hypot(drawing.b.x-drawing.a.x,drawing.b.y-drawing.a.y);if(len>12){walls.push({a:{...drawing.a},b:{...drawing.b}});if(walls.length>18)walls.shift();msg.textContent='wall accepted by local zoning'}else msg.textContent='drag farther to make a wall';drawing=null}
+c.addEventListener('pointerdown',e=>{try{c.setPointerCapture?.(e.pointerId)}catch{}startDraw(e)});
+c.addEventListener('pointermove',moveDraw);
+c.addEventListener('pointerup',endDraw);
 c.addEventListener('pointercancel',()=>drawing=null);
+c.addEventListener('touchstart',startDraw,{passive:false});
+c.addEventListener('touchmove',moveDraw,{passive:false});
+c.addEventListener('touchend',endDraw,{passive:false});
+c.addEventListener('touchcancel',()=>drawing=null,{passive:false});
 document.querySelector('#clear').onclick=()=>{walls=[];msg.textContent='the mite has been evicted from geometry'};
 })();
 </script></body></html>
