@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Lantern Mites</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050607;color:#ddd;font-family:system-ui,-apple-system,sans-serif;touch-action:none;user-select:none}
+canvas{display:block;width:100%;height:100%}
+#title{position:fixed;left:14px;top:max(12px,env(safe-area-inset-top));z-index:3;pointer-events:none}
+#title b{display:block;font:800 13px/1 Georgia,serif;letter-spacing:.16em;color:#d8ccb0}
+#title small{display:block;margin-top:5px;font-size:9px;letter-spacing:.12em;color:#8c887f}
+#hint{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:3;white-space:nowrap;font:10px Georgia,serif;letter-spacing:.11em;color:#8f8a80;pointer-events:none;transition:opacity 1s}
+#badge{position:fixed;right:12px;top:max(11px,env(safe-area-inset-top));z-index:3;width:28px;height:28px;border:1px solid #8f765055;border-radius:7px;display:grid;place-items:center;color:#a98d60;font:bold 13px Georgia;opacity:.65;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="title"><b>LANTERN MITES</b><small>they dislike being observed</small></div>
+<div id="badge">W</div>
+<div id="hint">drag the lantern through the dark</div>
+<canvas id="c"></canvas>
+<script>
+const c=document.querySelector('#c'),x=c.getContext('2d'),hint=document.querySelector('#hint');
+let W=0,H=0,dpr=1,down=false,lastMove=performance.now(),px=innerWidth*.5,py=innerHeight*.55;
+const N=34, mites=[];
+function resize(){
+ dpr=Math.min(devicePixelRatio||1,2); W=innerWidth; H=innerHeight;
+ c.width=W*dpr;c.height=H*dpr;c.style.width=W+'px';c.style.height=H+'px';x.setTransform(dpr,0,0,dpr,0,0)
+}
+addEventListener('resize',resize);resize();
+function rnd(a,b){return a+Math.random()*(b-a)}
+for(let i=0;i<N;i++)mites.push({
+ x:rnd(15,W-15),y:rnd(70,H-20),vx:rnd(-.42,.42),vy:rnd(-.42,.42),
+ a:rnd(0,6.28),turn:rnd(-.025,.025),fear:0,seen:0,size:rnd(1.1,2.3)
+});
+function pointer(e){
+ const p=e.touches?e.touches[0]:e; if(!p)return;
+ px=p.clientX;py=p.clientY;down=true;lastMove=performance.now();hint.style.opacity=.15
+}
+addEventListener('pointerdown',pointer);addEventListener('pointermove',e=>{if(down)pointer(e)});
+addEventListener('pointerup',()=>{down=false});
+addEventListener('touchstart',pointer,{passive:false});addEventListener('touchmove',e=>{pointer(e);e.preventDefault()},{passive:false});addEventListener('touchend',()=>down=false);
+function step(m,t){
+ const dx=px-m.x,dy=py-m.y,d=Math.hypot(dx,dy);
+ const lit=down&&d<115;
+ if(lit){
+   m.seen=Math.min(1,m.seen+.13); m.fear=Math.min(1,m.fear+.06);
+   m.vx*=.78;m.vy*=.78;
+ }else{
+   m.seen=Math.max(0,m.seen-.045); m.fear=Math.max(0,m.fear-.018);
+   m.a+=m.turn+rnd(-.012,.012)+(m.fear*rnd(-.04,.04));
+   const speed=.28+m.fear*.75;
+   m.vx+=(Math.cos(m.a)*speed-m.vx)*.055;
+   m.vy+=(Math.sin(m.a)*speed-m.vy)*.055;
+   m.x+=m.vx;m.y+=m.vy;
+ }
+ if(m.x<8){m.x=8;m.a=Math.cos(m.a)<0?Math.PI-m.a:m.a}
+ if(m.x>W-8){m.x=W-8;m.a=Math.cos(m.a)>0?Math.PI-m.a:m.a}
+ if(m.y<62){m.y=62;m.a=-m.a}
+ if(m.y>H-8){m.y=H-8;m.a=-m.a}
+ // avoid crowding without making a perfect flock
+ for(const o of mites){
+   if(o===m)continue; const qx=m.x-o.x,qy=m.y-o.y,q2=qx*qx+qy*qy;
+   if(q2<150&&q2>0){m.vx+=qx*.0035;m.vy+=qy*.0035}
+ }
+}
+function drawMite(m){
+ const dx=px-m.x,dy=py-m.y,d=Math.hypot(dx,dy),light=down?Math.max(0,1-d/115):0;
+ const alpha=Math.max(light*.95,m.seen*.22);
+ if(alpha<.02)return;
+ x.save();x.translate(m.x,m.y);x.rotate(Math.atan2(m.vy,m.vx));
+ x.globalAlpha=alpha;
+ const frozen=light>.05;
+ x.strokeStyle=frozen?'#9a8f78':'#b9aa87';x.fillStyle=frozen?'#756f62':'#958769';x.lineWidth=.7;
+ x.beginPath();x.ellipse(0,0,m.size*1.7,m.size,0,0,Math.PI*2);x.fill();
+ for(let s=-1;s<=1;s+=2){
+   x.beginPath();x.moveTo(-1,s*.6);x.lineTo(-4,s*2.3);x.stroke();
+   x.beginPath();x.moveTo(1,s*.6);x.lineTo(4,s*2.4);x.stroke();
+ }
+ x.restore()
+}
+function frame(t){
+ x.clearRect(0,0,W,H);
+ const g=x.createRadialGradient(W*.5,H*.45,0,W*.5,H*.45,Math.max(W,H)*.7);
+ g.addColorStop(0,'#11120f');g.addColorStop(1,'#030405');x.fillStyle=g;x.fillRect(0,0,W,H);
+ // faint floor grain
+ x.globalAlpha=.08;x.fillStyle='#c1b28f';
+ for(let i=0;i<26;i++){let gx=(i*137.5+t*.003)%W,gy=(i*73.3)%H;x.fillRect(gx,gy,1,1)}
+ x.globalAlpha=1;
+ for(const m of mites){step(m,t);drawMite(m)}
+ if(down){
+   const r=115;
+   const glow=x.createRadialGradient(px,py,0,px,py,r);
+   glow.addColorStop(0,'rgba(255,225,156,.18)');glow.addColorStop(.5,'rgba(255,212,128,.07)');glow.addColorStop(1,'rgba(255,210,120,0)');
+   x.fillStyle=glow;x.beginPath();x.arc(px,py,r,0,Math.PI*2);x.fill();
+   x.strokeStyle='rgba(255,229,175,.13)';x.lineWidth=1;x.beginPath();x.arc(px,py,78,0,Math.PI*2);x.stroke();
+ }
+ // occasional evidence that something moved outside the light
+ if(!down && t-lastMove>1200){
+   x.globalAlpha=.08;x.fillStyle='#cbbd9e';
+   const m=mites[(Math.floor(t/1100))%mites.length];x.beginPath();x.arc(m.x,m.y,1.2,0,6.28);x.fill();x.globalAlpha=1
+ }
+ requestAnimationFrame(frame)
+}
+requestAnimationFrame(frame);
+</script>
+</body></html>
