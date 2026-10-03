@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Dust Bunny Union</title><style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#171511;touch-action:none;user-select:none;font-family:system-ui;color:#e7ddc8}canvas{display:block;width:100%;height:100%}#note{position:fixed;top:max(14px,env(safe-area-inset-top));left:0;right:0;text-align:center;pointer-events:none;font-size:11px;letter-spacing:.14em;opacity:.55}#w{position:fixed;right:14px;bottom:max(12px,env(safe-area-inset-bottom));font:bold 12px Georgia;opacity:.28}</style></head><body><canvas id="c"></canvas><div id="note">DISTURB THE DUST</div><div id="w">W</div><script>
+const c=document.querySelector('#c'),x=c.getContext('2d');let W,H,dpr,b=[],p={x:0,y:0,on:false},t=0,peace=0;
+function size(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;x.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',size);size();
+function bunny(){let edge=Math.random()<.5;return{x:Math.random()*W,y:H-15-Math.random()*22,vx:0,vy:0,r:5+Math.random()*5,a:Math.random()*6.28,brave:Math.random()}}
+for(let i=0;i<26;i++)b.push(bunny());
+function pt(e,on){let q=e.touches?e.touches[0]:e;p.x=q.clientX;p.y=q.clientY;p.on=on;peace=0}addEventListener('pointerdown',e=>pt(e,true));addEventListener('pointermove',e=>{if(p.on)pt(e,true)});addEventListener('pointerup',()=>p.on=false);
+function drawB(q){x.save();x.translate(q.x,q.y);x.rotate(q.a);x.fillStyle='#aaa59a';x.beginPath();x.arc(0,0,q.r,0,7);x.arc(-q.r*.45,-q.r*.7,q.r*.38,0,7);x.arc(q.r*.45,-q.r*.7,q.r*.38,0,7);x.fill();x.fillStyle='#26231f';x.beginPath();x.arc(-q.r*.3,-q.r*.05,1,0,7);x.arc(q.r*.3,-q.r*.05,1,0,7);x.fill();x.restore()}
+function sign(q,msg){x.save();x.translate(q.x,q.y-q.r-8);x.strokeStyle='#8d7657';x.lineWidth=1;x.beginPath();x.moveTo(0,0);x.lineTo(0,-18);x.stroke();x.fillStyle='#d8c49d';x.fillRect(-20,-31,40,15);x.fillStyle='#332b21';x.font='bold 6px system-ui';x.textAlign='center';x.fillText(msg,0,-21);x.restore()}
+function loop(){t++;peace++;x.fillStyle='#171511';x.fillRect(0,0,W,H);x.fillStyle='#29251f';x.fillRect(0,H-8,W,8);
+for(let q of b){if(p.on){let dx=q.x-p.x,dy=q.y-p.y,d=Math.hypot(dx,dy)||1;if(d<130){let f=(130-d)/130*1.8;q.vx+=dx/d*f;q.vy+=dy/d*f-0.15}}else if(peace>180){q.vx+=(W/2-q.x)*.00006}
+q.vy+=.035;q.vx*=.96;q.vy*=.96;q.x+=q.vx;q.y+=q.vy;if(q.y>H-13){q.y=H-13;q.vy*=-.25}if(q.x<8){q.x=8;q.vx=Math.abs(q.vx)}if(q.x>W-8){q.x=W-8;q.vx=-Math.abs(q.vx)}drawB(q)}
+if(peace>420){let s=[...b].sort((a,z)=>a.x-z.x);['NO BROOMS','DUST RIGHTS','WE LIVE HERE','LOCAL 404'].forEach((m,i)=>sign(s[Math.floor((i+1)*s.length/5)],m));x.fillStyle='#d7c9ad';x.textAlign='center';x.font='12px Georgia';x.fillText('THE DUST HAS UNIONIZED.',W/2,58)}
+if(p.on){x.strokeStyle='#ffffff18';x.beginPath();x.arc(p.x,p.y,45+Math.sin(t*.15)*4,0,7);x.stroke()}requestAnimationFrame(loop)}loop();
+</script></body></html>
