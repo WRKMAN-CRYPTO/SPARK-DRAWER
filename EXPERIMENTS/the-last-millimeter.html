@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Last Millimeter</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#0b0d10;color:#cfd5dc;font-family:system-ui,sans-serif}
+canvas{width:100%;height:100%;display:block;touch-action:none}
+small{position:fixed;left:14px;bottom:12px;opacity:.45;letter-spacing:.08em}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas><small>THE LAST MILLIMETER</small>
+<script>
+const c=document.querySelector('canvas'),g=c.getContext('2d');
+let w,h,d=Math.min(devicePixelRatio||1,2),p=null,t=0;
+function size(){w=innerWidth;h=innerHeight;c.width=w*d;c.height=h*d;g.setTransform(d,0,0,d,0,0)}
+size();addEventListener('resize',size);
+function point(e){const r=c.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
+c.onpointerdown=e=>{p=point(e);c.setPointerCapture(e.pointerId)};
+c.onpointermove=e=>{if(p)p=point(e)};
+c.onpointerup=c.onpointercancel=()=>p=null;
+
+function frame(ms){
+ t=ms*.001;g.clearRect(0,0,w,h);
+ const cx=w/2,cy=h/2,R=Math.min(w,h)*.24;
+ // A circle missing one tiny piece.
+ const gap=.13;
+ g.strokeStyle='rgba(235,240,245,.78)';g.lineWidth=2;
+ g.beginPath();g.arc(cx,cy,R,gap,Math.PI*2-gap);g.stroke();
+
+ // The two ends want to meet. Attention makes the gap smaller,
+ // but the final millimeter refuses to disappear.
+ let attention=0;
+ if(p){const q=Math.hypot(p.x-cx,p.y-cy);attention=Math.max(0,1-q/(R*2.2))}
+ const minGap=.012;
+ const liveGap=Math.max(minGap,gap*(1-attention*.94));
+ const a={x:cx+Math.cos(liveGap)*R,y:cy+Math.sin(liveGap)*R};
+ const b={x:cx+Math.cos(-liveGap)*R,y:cy+Math.sin(-liveGap)*R};
+
+ // Tiny endpoint tremor, strongest when nearly closed.
+ const trem=(1-liveGap/gap)*2.2;
+ a.y+=Math.sin(t*7)*trem;b.y+=Math.cos(t*6.3)*trem;
+
+ g.fillStyle='rgba(255,255,255,.95)';
+ for(const q of [a,b]){g.beginPath();g.arc(q.x,q.y,2.8,0,Math.PI*2);g.fill()}
+
+ if(p){
+   g.strokeStyle='rgba(255,255,255,.12)';g.lineWidth=1;
+   g.beginPath();g.arc(p.x,p.y,9,0,Math.PI*2);g.stroke();
+ }
+ requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body></html>
