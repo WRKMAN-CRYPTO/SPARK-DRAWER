@@ -1,0 +1,16 @@
+<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#eee7d6}canvas{display:block;touch-action:none}</style><canvas id="c"></canvas><script>
+const g=c.getContext('2d'),q=[],saved=[],b={x:90,y:90};let last=0,carrying=false;
+function size(){c.width=innerWidth;c.height=innerHeight}size();onresize=size;
+c.onpointerdown=e=>q.push({x:e.clientX,y:e.clientY});
+function frame(t){
+let dt=Math.min((t-last)/1000||0,.05);last=t;
+let h={x:c.width/2,y:c.height*.6};
+let p=carrying?{x:h.x+Math.cos(saved.length*2.4)*7*Math.sqrt(saved.length),y:h.y+Math.sin(saved.length*2.4)*7*Math.sqrt(saved.length)}:q[0];
+if(p){let dx=p.x-b.x,dy=p.y-b.y,d=Math.hypot(dx,dy);if(d>3){b.x+=dx/d*Math.min(d,80*dt);b.y+=dy/d*Math.min(d,80*dt)}else if(carrying){saved.push(p);carrying=false}else{q.shift();carrying=true}}
+g.clearRect(0,0,c.width,c.height);g.strokeStyle='#c8bba3';g.beginPath();g.arc(h.x,h.y,90,0,7);g.stroke();
+g.fillStyle='#b18a4b';for(let p of [...q,...saved]){g.beginPath();g.arc(p.x,p.y,3,0,7);g.fill()}
+g.fillStyle='#45473c';g.beginPath();g.ellipse(b.x,b.y,10,7,0,0,7);g.fill();g.beginPath();g.arc(b.x+9,b.y,5,0,7);g.fill();
+if(carrying){g.fillStyle='#b18a4b';g.fillRect(b.x+13,b.y-2,5,5)}
+requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+</script>
