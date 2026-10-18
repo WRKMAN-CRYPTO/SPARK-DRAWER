@@ -1,0 +1,28 @@
+<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>html,body{margin:0;background:#11131a;overflow:hidden}canvas{display:block;touch-action:none}</style>
+<canvas id="c"></canvas><script>
+const g=c.getContext('2d');let w,h,t=0,shift=0,last=0;
+function resize(){w=c.width=innerWidth;h=c.height=innerHeight}resize();onresize=resize;
+c.onpointerdown=()=>{t=0};
+const smooth=(a,b,v)=>{let x=Math.max(0,Math.min(1,(v-a)/(b-a)));return x*x*(3-2*x)};
+function draw(now){
+let dt=Math.min(.05,(now-last)/1000||0);last=now;t+=dt;
+if(t>12){t=0;shift=(shift+9)%81}
+const o=smooth(2,4,t)*(1-smooth(10,11,t));
+const trip=smooth(4,6,t)*(1-smooth(8,10,t));
+const visible=smooth(3,4,t)*(1-smooth(9,10,t));
+g.fillStyle='#11131a';g.fillRect(0,0,w,h);
+g.save();g.translate(w/2,h*.55);let s=Math.min(w/300,h/400,1.5);g.scale(s,s);
+g.strokeStyle='#353846';g.beginPath();g.moveTo(-130,56);g.lineTo(130,56);g.stroke();
+g.fillStyle='#06080d';g.fillRect(-94,-60,60,115);
+g.strokeStyle='#878193';g.strokeRect(-94,-60,60,115);
+g.fillStyle='#585365';g.fillRect(-94,-60,60*(1-o),115);
+g.fillStyle='#9297a3';g.beginPath();g.ellipse(35+shift+9*smooth(6,7,t),52,8,4,0,0,7);g.fill();
+if(visible>.01){g.globalAlpha=visible;let x=-60+trip*(91+shift);
+g.fillStyle='#bcb4cf';g.beginPath();g.ellipse(x,42,8,11,0,0,7);g.fill();
+g.fillStyle='#11131a';for(let d of [-3,3]){g.beginPath();g.arc(x+d,38,1.4,0,7);g.fill()}g.globalAlpha=1}
+g.restore();
+g.fillStyle='#818595';g.textAlign='center';g.font='12px system-ui';
+g.fillText('THE SHY DOOR',w/2,45);g.fillText('touch to interrupt',w/2,h-25);
+requestAnimationFrame(draw)}requestAnimationFrame(draw);
+</script>
