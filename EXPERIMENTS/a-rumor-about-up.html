@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>A Rumor About Up</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090e17}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+aside{position:fixed;bottom:16px;left:16px;right:16px;color:#94a8bb;font:12px/1.5 system-ui,sans-serif;pointer-events:none;opacity:.8}
+strong{color:#d4e7ee;font-weight:500;letter-spacing:.09em}
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+<aside><strong>A RUMOR ABOUT UP</strong><br>Tap a raindrop to give it a different idea. Hold to begin again.</aside>
+<script>
+/*
+  One raindrop disagrees with gravity.
+  If it brushes past another, its strange idea might spread.
+  Nothing is trying to win.
+*/
+const c=document.querySelector('canvas');
+const g=c.getContext('2d');
+const dpr=Math.min(devicePixelRatio||1,2);
+let W=0,H=0,drops=[],last=0,holdTimer=null,holding=false;
+const COUNT=115;
+const rnd=(a,b)=>a+Math.random()*(b-a);
+function resize(){
+ W=innerWidth;H=innerHeight;
+ c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);
+ g.setTransform(dpr,0,0,dpr,0,0);
+ if(!drops.length) reset();
+}
+function reset(){
+ drops=Array.from({length:COUNT},()=>({
+  x:rnd(12,W-12),y:rnd(0,H),speed:rnd(34,72),
+  sway:rnd(0,6.283),up:false,immune:0,r:rnd(1.3,2.5)
+ }));
+}
+function closest(x,y){
+ let best=null,dist=Infinity;
+ for(const q of drops){
+  const dx=q.x-x,dy=q.y-y,dd=dx*dx+dy*dy;
+  if(dd<dist){dist=dd;best=q}
+ }
+ return best;
+}
+function seed(x,y){
+ const q=closest(x,y);
+ if(q){q.up=true;q.immune=0.9;q.x=x;q.y=y}
+}
+c.addEventListener('pointerdown',e=>{
+ holding=true;
+ const x=e.clientX,y=e.clientY;
+ holdTimer=setTimeout(()=>{if(holding){reset();holding=false}},700);
+});
+c.addEventListener('pointerup',e=>{
+ clearTimeout(holdTimer);
+ if(holding)seed(e.clientX,e.clientY);
+ holding=false;
+});
+c.addEventListener('pointercancel',()=>{clearTimeout(holdTimer);holding=false});
+function frame(ms){
+ const dt=Math.min((ms-last)/1000||.016,.05);last=ms;
+ g.fillStyle='#090e17';g.fillRect(0,0,W,H);
+ // A few distant, unmoving points for the rain to contradict.
+ g.fillStyle='rgba(165,185,205,.13)';
+ for(let i=0;i<14;i++){
+  const x=(i*131.7+31)%W,y=(i*197.3+73)%H;
+  g.fillRect(x,y,1,1);
+ }
+ for(const q of drops){
+  q.immune=Math.max(0,q.immune-dt);
+  q.y+=(q.up?-1:1)*q.speed*dt;
+  q.x+=Math.sin(ms*.00055+q.sway)*5*dt;
+  if(q.y<-10)q.y=H+10;
+  if(q.y>H+10)q.y=-10;
+  if(q.x<0)q.x=W;
+  if(q.x>W)q.x=0;
+ }
+ // The upward idea travels by chance encounters, not by a global switch.
+ for(const a of drops){
+  if(!a.up)continue;
+  for(const b of drops){
+   if(b.up||b.immune>0)continue;
+   const dx=a.x-b.x,dy=a.y-b.y;
+   if(dx*dx+dy*dy<95 && Math.random()<.14){
+    b.up=true;b.immune=.8;
+   }
+  }
+ }
+ for(const q of drops){
+  g.strokeStyle=q.up?'rgba(142,238,216,.85)':'rgba(119,147,172,.55)';
+  g.lineWidth=q.r;
+  g.beginPath();
+  g.moveTo(q.x,q.y);
+  g.lineTo(q.x,q.y+(q.up?8:-8));
+  g.stroke();
+  if(q.up){
+   g.fillStyle='rgba(175,255,234,.9)';
+   g.beginPath();g.arc(q.x,q.y,1.3,0,Math.PI*2);g.fill();
+  }
+ }
+ requestAnimationFrame(frame);
+}
+addEventListener('resize',resize);resize();requestAnimationFrame(frame);
+</script>
+</body>
+</html>
