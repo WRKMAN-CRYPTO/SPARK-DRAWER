@@ -14,6 +14,7 @@ canvas{display:block;width:100vw;height:100dvh;touch-action:none;cursor:crosshai
 #footer{position:fixed;bottom:max(17px,env(safe-area-inset-bottom));left:18px;right:18px;display:flex;align-items:end;justify-content:space-between;gap:12px}
 #hint{font-size:10px;line-height:1.65;color:#aab4c6aa;max-width:185px;pointer-events:none}
 #buttons{display:flex;gap:8px;align-items:center}
+@media(max-width:580px){#footer{flex-direction:column;align-items:center;gap:9px}#hint{max-width:none;text-align:center}#buttons{justify-content:center}}
 button{background:#101726d9;color:#dbe4eb;border:1px solid #6c759266;border-radius:5px;font:10px ui-monospace,SFMono-Regular,Menlo,monospace;padding:10px 12px;letter-spacing:.07em;white-space:nowrap}
 button:active{background:#425066}
 #clock{position:fixed;right:22px;top:max(22px,env(safe-area-inset-top));color:#dce4ea80;font-size:10px;pointer-events:none}
@@ -26,7 +27,7 @@ button:active{background:#425066}
 <div id="clock">00:00</div>
 <div id="footer">
 <div id="hint">touch to make a ripple<br>drag to write a disturbance<br>watch the old paths</div>
-<div id="buttons"><button id="memory">MEMORY ON</button><button id="erase">ERASE</button></div>
+<div id="buttons"><button id="auto" aria-pressed="false">AUTO OFF</button><button id="memory">MEMORY ON</button><button id="erase">ERASE</button></div>
 </div>
 <script>
 (() => {
@@ -39,9 +40,10 @@ const ctx=canvas.getContext('2d',{alpha:false});
 const pixelCanvas=document.createElement('canvas');
 const pctx=pixelCanvas.getContext('2d',{alpha:false});
 const label=document.getElementById('memory');
+const autoLabel=document.getElementById('auto');
 const clock=document.getElementById('clock');
 let nx=0,ny=0,size=0,cur,prev,next,scar,image,pixels;
-let frame=0,remember=true,down=false,lastDrag=-999,elapsed=0;
+let frame=0,remember=true,autoWaves=false,down=false,lastDrag=-999,elapsed=0;
 const sources=[
   {x:.21,y:.28,f:61,phase:.6,amp:2.6},
   {x:.78,y:.61,f:83,phase:2.1,amp:-2.2},
@@ -99,7 +101,7 @@ function step(){
   for(let y=0;y<ny;y++){next[y*nx]=0;next[y*nx+nx-1]=0;}
   const old=prev;prev=cur;cur=next;next=old;
   frame++;
-  for(const s of sources){
+  if(autoWaves) for(const s of sources){
     if(frame%s.f===0){
       const driftX=.045*Math.sin(frame*.0032+s.phase);
       const driftY=.065*Math.cos(frame*.0021+s.phase);
@@ -123,7 +125,7 @@ function render(){
   pctx.putImageData(image,0,0);
   ctx.imageSmoothingEnabled=true;
   ctx.drawImage(pixelCanvas,0,0,innerWidth,innerHeight);
-  // The sources are alive, but they are not visible until they emit a pulse.
+  // Automatic sources are optional; touch alone can drive the field.
 }
 function erase(){
   cur.fill(0);prev.fill(0);next.fill(0);scar.fill(0);frame=0;elapsed=0;clock.textContent='00:00';
@@ -151,11 +153,18 @@ label.addEventListener('click',()=>{
   remember=!remember;label.textContent=remember?'MEMORY ON':'MEMORY OFF';
   label.setAttribute('aria-pressed',String(remember));
 });
+autoLabel.addEventListener('click',()=>{
+  autoWaves=!autoWaves;
+  autoLabel.textContent=autoWaves?'AUTO ON':'AUTO OFF';
+  autoLabel.setAttribute('aria-pressed',String(autoWaves));
+  if(autoWaves){
+    // Respond immediately to the toggle, without waiting for the next timer tick.
+    for(const s of sources) pulse(s.x*nx,s.y*ny,s.amp,2.15);
+  }
+});
 document.getElementById('erase').addEventListener('click',erase);
 addEventListener('resize',resize);
 resize();
-pulse(nx*.21,ny*.28,3.2,2.7);
-pulse(nx*.78,ny*.61,-2.4,2.7);
 let last=performance.now();
 function tick(now){
   const dt=Math.min(.05,(now-last)/1000);last=now;
