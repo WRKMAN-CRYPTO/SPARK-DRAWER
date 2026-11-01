@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>A Clock With a Hole in It</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0c1015;color:#c9d4dd;font-family:system-ui,sans-serif}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .note{position:fixed;left:16px;right:16px;bottom:20px;text-align:center;pointer-events:none;
+    font-size:12px;letter-spacing:.04em;color:#92a2b0;opacity:.85}
+</style>
+</head>
+<body>
+<canvas id="world" aria-label="A clock that loses its seconds. Touch loose dots to bring them home."></canvas>
+<div class="note">SECONDS FALL OUT. TOUCH THE STRAYS TO BRING THEM HOME.</div>
+<script>
+(() => {
+  const canvas=document.getElementById('world');
+  const ctx=canvas.getContext('2d');
+  const TAU=Math.PI*2;
+  let W=0,H=0,D=1,cx=0,cy=0,r=0;
+  let born=0,returned=0,lastBirth=0,lastFrame=0;
+  const escaped=[];
+  const pointer={x:-1000,y:-1000,down:false};
+
+  function resize(){
+    W=innerWidth;H=innerHeight;
+    D=Math.min(devicePixelRatio||1,2);
+    canvas.width=Math.round(W*D);canvas.height=Math.round(H*D);
+    ctx.setTransform(D,0,0,D,0,0);
+    cx=W/2;cy=H/2-12;r=Math.min(W,H)*.235;
+  }
+  addEventListener('resize',resize);resize();
+
+  function locate(e){
+    const b=canvas.getBoundingClientRect();
+    pointer.x=e.clientX-b.left;pointer.y=e.clientY-b.top;
+  }
+  canvas.addEventListener('pointerdown',e=>{
+    pointer.down=true;locate(e);canvas.setPointerCapture(e.pointerId);
+    collectNear(pointer.x,pointer.y);
+  });
+  canvas.addEventListener('pointermove',e=>{
+    locate(e);if(pointer.down)collectNear(pointer.x,pointer.y);
+  });
+  canvas.addEventListener('pointerup',()=>pointer.down=false);
+  canvas.addEventListener('pointercancel',()=>pointer.down=false);
+  canvas.addEventListener('lostpointercapture',()=>pointer.down=false);
+
+  function collectNear(x,y){
+    for(const s of escaped){
+      if(s.returning)continue;
+      const dist=Math.hypot(s.x-x,s.y-y);
+      if(dist<Math.max(34,r*.32))s.returning=true;
+    }
+  }
+
+  function emit(){
+    born++;
+    const angle=(born%60)/60*TAU-Math.PI/2;
+    const a=angle+(Math.random()-.5)*.16;
+    const px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;
+    const speed=.5+Math.random()*.65;
+    escaped.push({
+      x:px,y:py,
+      vx:Math.cos(a)*speed+(Math.random()-.5)*.5,
+      vy:Math.sin(a)*speed+(Math.random()-.5)*.5,
+      returning:false,
+      seed:Math.random()*TAU,
+      age:0
+    });
+    // A forgotten second can remain lost. Keep the room from filling forever.
+    if(escaped.length>90)escaped.shift();
+  }
+
+  function circle(x,y,radius,color){
+    ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,radius,0,TAU);ctx.fill();
+  }
+
+  function frame(now){
+    const dt=Math.min(2.5,Math.max(.1,(now-lastFrame)/16.67||1));
+    lastFrame=now;
+    if(!lastBirth)lastBirth=now;
+    if(now-lastBirth>1050){
+      emit();lastBirth=now;
+    }
+    ctx.clearRect(0,0,W,H);
+
+    // The clock has a deliberate opening at six o'clock.
+    ctx.lineWidth=1.5;
+    ctx.strokeStyle='#718493';
+    ctx.beginPath();ctx.arc(cx,cy,r,Math.PI*.5+.11,Math.PI*.5+TAU-.11);ctx.stroke();
+    for(let i=0;i<60;i++){
+      if(i===30)continue;
+      const a=i/60*TAU-Math.PI/2;
+      const inner=r-(i%5===0?13:6);
+      ctx.strokeStyle=i%5===0?'#687b88':'#35434e';
+      ctx.beginPath();
+      ctx.moveTo(cx+Math.cos(a)*inner,cy+Math.sin(a)*inner);
+      ctx.lineTo(cx+Math.cos(a)*(r-2),cy+Math.sin(a)*(r-2));
+      ctx.stroke();
+    }
+
+    // The pale hand shows the seconds that would have passed.
+    const ghost=(born%60)/60*TAU-Math.PI/2;
+    ctx.setLineDash([3,6]);ctx.lineWidth=1.4;ctx.strokeStyle='#405360';
+    ctx.beginPath();ctx.moveTo(cx,cy);
+    ctx.lineTo(cx+Math.cos(ghost)*r*.68,cy+Math.sin(ghost)*r*.68);ctx.stroke();
+    ctx.setLineDash([]);
+
+    // The bright hand only advances for seconds that return.
+    const actual=(returned%60)/60*TAU-Math.PI/2;
+    ctx.lineWidth=2.5;ctx.lineCap='round';ctx.strokeStyle='#d5e5e8';
+    ctx.beginPath();ctx.moveTo(cx-Math.cos(actual)*r*.12,cy-Math.sin(actual)*r*.12);
+    ctx.lineTo(cx+Math.cos(actual)*r*.74,cy+Math.sin(actual)*r*.74);ctx.stroke();
+    circle(cx,cy,4,'#d5e5e8');
+
+    for(let i=escaped.length-1;i>=0;i--){
+      const s=escaped[i];s.age+=dt;
+      if(s.returning){
+        const dx=cx-s.x,dy=cy-s.y,dist=Math.hypot(dx,dy)||1;
+        s.vx=s.vx*.83+dx/dist*1.4*dt;
+        s.vy=s.vy*.83+dy/dist*1.4*dt;
+        if(dist<9){escaped.splice(i,1);returned++;continue;}
+      }else{
+        s.vx+=Math.cos(s.age*.021+s.seed)*.012*dt;
+        s.vy+=Math.sin(s.age*.017+s.seed)*.012*dt;
+        s.vx*=.996;s.vy*=.996;
+        // The seconds are allowed to wander, but not leave the room.
+        if(s.x<12||s.x>W-12)s.vx*=-.85;
+        if(s.y<12||s.y>H-38)s.vy*=-.85;
+        if(pointer.down&&Math.hypot(s.x-pointer.x,s.y-pointer.y)<Math.max(34,r*.32)){
+          s.returning=true;
+        }
+      }
+      s.x+=s.vx*dt;s.y+=s.vy*dt;
+      circle(s.x,s.y,s.returning?3.7:2.8,s.returning?'#f5e6b8':'#8bb3c1');
+    }
+
+    // A tiny count of unreturned seconds, not a score.
+    ctx.fillStyle='#748793';ctx.font='12px system-ui,sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(escaped.length+' wandering',cx,cy+r+34);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
