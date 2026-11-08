@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Unobserved Constellation</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#070b13;color:#8894aa;font:12px system-ui}canvas{display:block;width:100%;height:100%;touch-action:none}aside{position:fixed;bottom:16px;left:18px;pointer-events:none;letter-spacing:.08em}</style>
+<canvas id="sky"></canvas><aside>THE UNOBSERVED CONSTELLATION · move to interrupt · tap to scatter</aside>
+<script>
+const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d');
+let W,H,D,stars=[],pointer={x:-9999,y:-9999},last=performance.now();
+const rand=(a,b)=>a+Math.random()*(b-a);
+function reset(){D=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*D;canvas.height=H*D;ctx.setTransform(D,0,0,D,0,0);
+stars=Array.from({length:36},(_,i)=>({x:rand(25,W-25),y:rand(25,H-25),phase:rand(0,7),id:i}));}
+reset();addEventListener('resize',reset);
+canvas.addEventListener('pointermove',e=>{pointer.x=e.clientX;pointer.y=e.clientY});
+canvas.addEventListener('pointerleave',()=>pointer={x:-9999,y:-9999});
+canvas.addEventListener('pointerdown',()=>reset());
+function frame(now){
+const dt=Math.min(.05,(now-last)/1000);last=now;
+ctx.clearRect(0,0,W,H);const t=now/1000;
+for(const s of stars){s.x+=Math.sin(t*.13+s.phase)*dt*1.5;s.y+=Math.cos(t*.11+s.phase)*dt*1.5}
+const edges=[];
+for(let i=0;i<stars.length;i++){
+const a=stars[i];const nearest=stars.filter(b=>b!==a).map(b=>({b,d:Math.hypot(b.x-a.x,b.y-a.y)})).sort((p,q)=>p.d-q.d).slice(0,2);
+for(const {b,d} of nearest)if(b.id>a.id&&d<Math.min(W,H)*.34)edges.push([a,b,d]);
+}
+for(const [a,b,d] of edges){
+const dx=b.x-a.x,dy=b.y-a.y;
+const u=Math.max(0,Math.min(1,((pointer.x-a.x)*dx+(pointer.y-a.y)*dy)/(dx*dx+dy*dy)));
+const distance=Math.hypot(pointer.x-(a.x+dx*u),pointer.y-(a.y+dy*u));
+const watch=Math.max(0,1-distance/115);
+const alpha=(.28+.15*Math.sin(t*.5+a.phase))*(1-watch);
+ctx.strokeStyle='rgba(150,194,244,'+Math.max(0,alpha)+')';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+}
+for(const s of stars){const distance=Math.hypot(pointer.x-s.x,pointer.y-s.y);const watch=Math.max(0,1-distance/90);ctx.fillStyle='rgba(230,240,255,'+(.55+.35*Math.sin(t+s.phase)**2)+')';ctx.beginPath();ctx.arc(s.x,s.y,1.5+watch*1.6,0,Math.PI*2);ctx.fill();}
+requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+</script></html>
