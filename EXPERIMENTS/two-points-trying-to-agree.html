@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Two Points Trying to Agree</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b1119;color:#b8c7d7;font:12px system-ui}canvas{display:block;width:100%;height:100%;touch-action:none}aside{position:fixed;left:16px;bottom:16px;opacity:.6;pointer-events:none}</style>
+<canvas id="sky"></canvas><aside>TWO POINTS TRYING TO AGREE · touch to interrupt their argument</aside>
+<script>
+const c=document.querySelector('canvas'),ctx=c.getContext('2d');
+let W,H,dpr,agents=[],touch=null,last=0;
+function resize(){W=innerWidth;H=innerHeight;dpr=Math.min(devicePixelRatio||1,2);c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);if(!agents.length)reset()}
+function reset(){agents=[{x:W*.3,y:H*.5,vx:0,vy:-.5,color:'#8fd9ff',history:[]},{x:W*.7,y:H*.5,vx:0,vy:.5,color:'#ffc58f',history:[]}]}
+addEventListener('resize',resize);resize();
+function pos(e){return{x:e.clientX,y:e.clientY}}
+c.addEventListener('pointerdown',e=>{touch=pos(e);c.setPointerCapture(e.pointerId)});
+c.addEventListener('pointermove',e=>{if(touch)touch=pos(e)});
+c.addEventListener('pointerup',()=>touch=null);c.addEventListener('pointercancel',()=>touch=null);
+function tick(ms){
+const dt=Math.min((ms-last)/16.67||1,2);last=ms;
+ctx.fillStyle='rgba(11,17,25,.16)';ctx.fillRect(0,0,W,H);
+for(let i=0;i<2;i++){
+ const a=agents[i],b=agents[1-i];
+ // Each point follows where the other was, not where it is.
+ const past=b.history[Math.max(0,b.history.length-32)]||b;
+ let dx=past.x-a.x,dy=past.y-a.y;
+ const distance=Math.hypot(dx,dy)||1;
+ const swirl=i?1:-1;
+ a.vx=(a.vx+(dx/distance*.12-dy/distance*.035*swirl)*dt)*.989;
+ a.vy=(a.vy+(dy/distance*.12+dx/distance*.035*swirl)*dt)*.989;
+ if(touch){let px=a.x-touch.x,py=a.y-touch.y,r=Math.hypot(px,py)||1;const force=Math.min(2.5,100/r);a.vx+=px/r*force*dt;a.vy+=py/r*force*dt}
+ a.x+=a.vx*dt;a.y+=a.vy*dt;
+ if(a.x<0||a.x>W)a.vx*=-.85;
+ if(a.y<0||a.y>H)a.vy*=-.85;
+ a.x=Math.max(0,Math.min(W,a.x));a.y=Math.max(0,Math.min(H,a.y));
+ a.history.push({x:a.x,y:a.y});if(a.history.length>90)a.history.shift();
+ ctx.beginPath();ctx.arc(a.x,a.y,4,0,Math.PI*2);ctx.fillStyle=a.color;ctx.fill();
+ ctx.beginPath();ctx.arc(past.x,past.y,1.8,0,Math.PI*2);ctx.fillStyle=a.color;ctx.globalAlpha=.3;ctx.fill();ctx.globalAlpha=1;
+}
+requestAnimationFrame(tick)
+}
+requestAnimationFrame(tick);
+</script>
