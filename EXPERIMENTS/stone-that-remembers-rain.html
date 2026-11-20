@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>THE STONE THAT REMEMBERS RAIN</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080e18;touch-action:none}canvas{display:block;width:100%;height:100%;touch-action:none}</style>
+<canvas id="c"></canvas>
+<script>
+/* SPARK-DRAWER: The stone that remembers rain.
+   Tap to rain. A field of little stones keeps a decaying memory of nearby impacts.
+   They do not move. Their history does. No score, no goal. */
+const c=document.querySelector('canvas'),g=c.getContext('2d');let W,H,D=1,stones=[],drops=[],t=0;
+function resize(){D=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*D;c.height=H*D;g.setTransform(D,0,0,D,0,0);
+const step=19;stones=[];for(let y=75;y<H-35;y+=step)for(let x=18;x<W-18;x+=step)stones.push({x,y,m:0,phase:Math.random()*6.28});}
+addEventListener('resize',resize);resize();
+function rain(x,y){drops.push({x,y,r:0});for(const s of stones){const d=Math.hypot(s.x-x,s.y-y);s.m=Math.min(1,s.m+Math.exp(-d*d/4200)*.85)}}
+c.addEventListener('pointerdown',e=>{c.setPointerCapture(e.pointerId);rain(e.clientX,e.clientY)});
+c.addEventListener('pointermove',e=>{if(e.buttons)rain(e.clientX,e.clientY)});
+function frame(){t++;g.fillStyle='#080e18';g.fillRect(0,0,W,H);
+g.textAlign='center';g.fillStyle='#d1d9e5';g.font='15px monospace';g.fillText('THE STONE THAT REMEMBERS RAIN',W/2,30);
+g.fillStyle='#73889d';g.font='11px monospace';g.fillText('touch to rain  ·  wait to forget',W/2,49);
+for(const s of stones){s.m*=.9993;const pulse=.5+.5*Math.sin(t*.015+s.phase);const r=1.2+3*s.m+1.4*s.m*pulse;
+g.beginPath();g.arc(s.x,s.y,r,0,Math.PI*2);g.fillStyle=`rgba(${Math.floor(90+150*s.m)},${Math.floor(115+105*s.m)},${Math.floor(140+85*s.m)},${.3+.7*Math.max(.12,s.m)})`;g.fill();}
+drops=drops.filter(d=>d.r<115);for(const d of drops){d.r+=1.6;g.beginPath();g.arc(d.x,d.y,d.r,0,Math.PI*2);g.strokeStyle=`rgba(112,200,255,${.28*(1-d.r/115)})`;g.lineWidth=1;g.stroke();}
+requestAnimationFrame(frame)}frame();
+</script></html>
